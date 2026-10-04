@@ -1,0 +1,3318 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Pitock API",
+    "version": "0.1.0"
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "access_token di Supabase Auth"
+      }
+    },
+    "schemas": {
+      "Health": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "version": {
+            "type": "string",
+            "example": "0.1.0"
+          }
+        },
+        "required": ["ok", "version"]
+      },
+      "Me": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": ["string", "null"]
+          },
+          "ai": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": ["platform", "byok"]
+              },
+              "provider": {
+                "type": ["string", "null"]
+              },
+              "model": {
+                "type": ["string", "null"]
+              }
+            },
+            "required": ["mode", "provider", "model"]
+          },
+          "platformQuota": {
+            "type": "object",
+            "properties": {
+              "used": {
+                "type": "integer"
+              },
+              "limit": {
+                "type": "integer"
+              }
+            },
+            "required": ["used", "limit"]
+          }
+        },
+        "required": ["userId", "email", "ai", "platformQuota"]
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "example": "NOT_FOUND"
+              },
+              "message": {
+                "type": "string"
+              },
+              "requestId": {
+                "type": "string"
+              }
+            },
+            "required": ["code", "message", "requestId"]
+          }
+        },
+        "required": ["error"]
+      },
+      "DeleteAccountInput": {
+        "type": "object",
+        "properties": {
+          "confirm": {
+            "type": "string",
+            "enum": ["ELIMINA"],
+            "description": "Conferma esplicita della cancellazione"
+          }
+        },
+        "required": ["confirm"]
+      },
+      "UploadUrl": {
+        "type": "object",
+        "properties": {
+          "receiptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "path": {
+            "type": "string"
+          },
+          "uploadUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "token": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["receiptId", "path", "uploadUrl", "token", "expiresAt"]
+      },
+      "DuplicateError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": ["DUPLICATE"]
+              },
+              "message": {
+                "type": "string"
+              },
+              "requestId": {
+                "type": "string"
+              },
+              "duplicateOf": {
+                "type": "string",
+                "format": "uuid"
+              }
+            },
+            "required": ["code", "message", "requestId", "duplicateOf"]
+          }
+        },
+        "required": ["error"]
+      },
+      "UploadUrlInput": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": ["camera", "file"]
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[A-Fa-f0-9]{64}$"
+          },
+          "mimeType": {
+            "$ref": "#/components/schemas/MimeType"
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "exclusiveMinimum": 0
+          },
+          "capturedAt": {
+            "type": "string",
+            "maxLength": 40,
+            "example": "2026-10-04T12:30:00+02:00"
+          },
+          "originalFilename": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          }
+        },
+        "required": ["source", "sha256", "mimeType", "sizeBytes"]
+      },
+      "MimeType": {
+        "type": "string",
+        "enum": ["image/jpeg", "image/png", "image/webp", "application/pdf"]
+      },
+      "UploadAccepted": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["uploaded"]
+          }
+        },
+        "required": ["status"]
+      },
+      "ReceiptDetail": {
+        "type": "object",
+        "properties": {
+          "receipt": {
+            "$ref": "#/components/schemas/Receipt"
+          },
+          "fileUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "extraction": {
+            "$ref": "#/components/schemas/ExtractionDetail"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReceiptItem"
+            }
+          },
+          "usage": {
+            "type": "object",
+            "properties": {
+              "provider": {
+                "type": "string"
+              },
+              "model": {
+                "type": "string"
+              },
+              "totalTokens": {
+                "type": ["integer", "null"]
+              },
+              "costUsd": {
+                "type": ["number", "null"]
+              }
+            },
+            "required": ["provider", "model", "totalTokens", "costUsd"]
+          }
+        },
+        "required": ["receipt", "items"]
+      },
+      "Receipt": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ReceiptSource"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ReceiptStatus"
+          },
+          "originalFilename": {
+            "type": ["string", "null"]
+          },
+          "sha256": {
+            "type": ["string", "null"]
+          },
+          "mimeType": {
+            "type": ["string", "null"]
+          },
+          "sizeBytes": {
+            "type": ["integer", "null"]
+          },
+          "capturedAt": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "errorCode": {
+            "type": ["string", "null"],
+            "description": "Motivo del fallimento quando status=failed. Valori attuali: NOT_A_RECEIPT, INVALID_OUTPUT, UNSUPPORTED_FILE_TYPE, USER_KEY_MISSING, USER_KEY_INVALID, USER_KEY_QUOTA, PLATFORM_QUOTA_EXCEEDED, AI_NOT_CONFIGURED, LLM_UNAVAILABLE, FILE_UNAVAILABLE, INTERNAL.",
+            "example": "NOT_A_RECEIPT"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "status",
+          "originalFilename",
+          "sha256",
+          "mimeType",
+          "sizeBytes",
+          "capturedAt",
+          "errorCode",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "ReceiptSource": {
+        "type": "string",
+        "enum": ["camera", "file", "manual"]
+      },
+      "ReceiptStatus": {
+        "type": "string",
+        "enum": ["pending_upload", "uploaded", "processing", "extracted", "failed"]
+      },
+      "ExtractionDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "receiptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "method": {
+            "type": "string",
+            "enum": ["llm", "manual"]
+          },
+          "provider": {
+            "type": ["string", "null"]
+          },
+          "model": {
+            "type": ["string", "null"]
+          },
+          "keySource": {
+            "type": ["string", "null"],
+            "enum": ["platform", "user", null]
+          },
+          "promptVersion": {
+            "type": ["string", "null"]
+          },
+          "merchantName": {
+            "type": ["string", "null"]
+          },
+          "merchantVat": {
+            "type": ["string", "null"]
+          },
+          "merchantAddress": {
+            "type": ["string", "null"]
+          },
+          "purchasedAt": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "total": {
+            "type": ["number", "null"]
+          },
+          "taxTotal": {
+            "type": ["number", "null"]
+          },
+          "paymentMethod": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaymentMethod"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Category"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "confidence": {
+            "type": ["number", "null"]
+          },
+          "notes": {
+            "type": ["string", "null"]
+          },
+          "isCurrent": {
+            "type": "boolean"
+          },
+          "editedByUser": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReceiptItem"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "receiptId",
+          "method",
+          "provider",
+          "model",
+          "keySource",
+          "promptVersion",
+          "merchantName",
+          "merchantVat",
+          "merchantAddress",
+          "purchasedAt",
+          "currency",
+          "total",
+          "taxTotal",
+          "paymentMethod",
+          "category",
+          "confidence",
+          "notes",
+          "isCurrent",
+          "editedByUser",
+          "createdAt",
+          "items"
+        ]
+      },
+      "PaymentMethod": {
+        "type": "string",
+        "enum": ["contanti", "carta", "bancomat", "altro", "sconosciuto"]
+      },
+      "Category": {
+        "type": "string",
+        "enum": [
+          "alimentari",
+          "ristorazione",
+          "trasporti",
+          "carburante",
+          "salute",
+          "casa",
+          "abbigliamento",
+          "tecnologia",
+          "svago",
+          "servizi",
+          "altro"
+        ]
+      },
+      "ReceiptItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "position": {
+            "type": "integer"
+          },
+          "description": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": ["number", "null"]
+          },
+          "unitPrice": {
+            "type": ["number", "null"]
+          },
+          "amount": {
+            "type": ["number", "null"]
+          },
+          "vatRate": {
+            "type": ["number", "null"]
+          },
+          "category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Category"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "position",
+          "description",
+          "quantity",
+          "unitPrice",
+          "amount",
+          "vatRate",
+          "category"
+        ]
+      },
+      "ManualReceiptInput": {
+        "type": "object",
+        "properties": {
+          "merchantName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "merchantVat": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32
+          },
+          "purchasedAt": {
+            "type": "string",
+            "maxLength": 40,
+            "example": "2026-10-04T12:30:00+02:00"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Za-z]{3}$",
+            "example": "EUR"
+          },
+          "total": {
+            "type": "number",
+            "minimum": -9999999999.99,
+            "maximum": 9999999999.99
+          },
+          "taxTotal": {
+            "type": "number",
+            "minimum": -9999999999.99,
+            "maximum": 9999999999.99
+          },
+          "paymentMethod": {
+            "$ref": "#/components/schemas/PaymentMethod"
+          },
+          "category": {
+            "$ref": "#/components/schemas/Category"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "description": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                },
+                "quantity": {
+                  "type": "number",
+                  "minimum": -9999999,
+                  "maximum": 9999999
+                },
+                "unitPrice": {
+                  "type": "number",
+                  "minimum": -9999999999.99,
+                  "maximum": 9999999999.99
+                },
+                "amount": {
+                  "type": "number",
+                  "minimum": -9999999999.99,
+                  "maximum": 9999999999.99
+                },
+                "vatRate": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "category": {
+                  "$ref": "#/components/schemas/Category"
+                }
+              },
+              "required": ["description"]
+            },
+            "maxItems": 500
+          }
+        },
+        "required": ["merchantName", "purchasedAt", "total", "paymentMethod", "category"]
+      },
+      "ReceiptList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReceiptListItem"
+            }
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["items", "nextCursor"]
+      },
+      "ReceiptListItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ReceiptSource"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ReceiptStatus"
+          },
+          "merchantName": {
+            "type": ["string", "null"]
+          },
+          "purchasedAt": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "total": {
+            "type": ["number", "null"]
+          },
+          "currency": {
+            "type": ["string", "null"]
+          },
+          "category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Category"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "thumbnailUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "status",
+          "merchantName",
+          "purchasedAt",
+          "total",
+          "currency",
+          "category",
+          "createdAt"
+        ]
+      },
+      "ExtractionHistory": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExtractionDetail"
+            }
+          }
+        },
+        "required": ["items"]
+      },
+      "ExtractionPatch": {
+        "type": "object",
+        "properties": {
+          "merchantName": {
+            "type": ["string", "null"],
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "merchantVat": {
+            "type": ["string", "null"],
+            "minLength": 1,
+            "maxLength": 32
+          },
+          "merchantAddress": {
+            "type": ["string", "null"],
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "purchasedAt": {
+            "type": ["string", "null"],
+            "maxLength": 40,
+            "example": "2026-10-04T12:30:00+02:00"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Za-z]{3}$",
+            "example": "EUR"
+          },
+          "total": {
+            "type": ["number", "null"],
+            "minimum": -9999999999.99,
+            "maximum": 9999999999.99
+          },
+          "taxTotal": {
+            "type": ["number", "null"],
+            "minimum": -9999999999.99,
+            "maximum": 9999999999.99
+          },
+          "paymentMethod": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaymentMethod"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Category"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notes": {
+            "type": ["string", "null"],
+            "maxLength": 2000
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "description": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                },
+                "quantity": {
+                  "type": "number",
+                  "minimum": -9999999,
+                  "maximum": 9999999
+                },
+                "unitPrice": {
+                  "type": "number",
+                  "minimum": -9999999999.99,
+                  "maximum": 9999999999.99
+                },
+                "amount": {
+                  "type": "number",
+                  "minimum": -9999999999.99,
+                  "maximum": 9999999999.99
+                },
+                "vatRate": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "category": {
+                  "$ref": "#/components/schemas/Category"
+                }
+              },
+              "required": ["description"]
+            },
+            "maxItems": 500
+          }
+        }
+      },
+      "ReextractInput": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": ["anthropic", "openai", "openrouter"]
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        }
+      },
+      "AiSettings": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/AiMode"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Provider"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "model": {
+            "type": ["string", "null"]
+          },
+          "fallbackToPlatform": {
+            "type": "boolean"
+          },
+          "keys": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApiKeyInfo"
+            }
+          },
+          "platformQuota": {
+            "$ref": "#/components/schemas/PlatformQuota"
+          }
+        },
+        "required": ["mode", "provider", "model", "fallbackToPlatform", "keys", "platformQuota"]
+      },
+      "AiMode": {
+        "type": "string",
+        "enum": ["platform", "byok"]
+      },
+      "Provider": {
+        "type": "string",
+        "enum": ["anthropic", "openai", "openrouter"]
+      },
+      "ApiKeyInfo": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/Provider"
+          },
+          "last4": {
+            "type": "string",
+            "description": "Ultimi 4 caratteri della chiave"
+          },
+          "verifiedAt": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          }
+        },
+        "required": ["provider", "last4", "verifiedAt"]
+      },
+      "PlatformQuota": {
+        "type": "object",
+        "properties": {
+          "used": {
+            "type": "integer"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
+        "required": ["used", "limit"]
+      },
+      "AiSettingsInput": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/AiMode"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Provider"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200,
+                "pattern": "^[\\w.:/@+-]+$",
+                "description": "ID del modello restituito da GET /v1/settings/ai/models"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fallbackToPlatform": {
+            "type": "boolean"
+          }
+        },
+        "required": ["mode"],
+        "description": "I campi omessi restano invariati. Con mode=byok servono provider, model e una chiave salvata per il provider."
+      },
+      "ApiKeyInput": {
+        "type": "object",
+        "properties": {
+          "apiKey": {
+            "type": "string",
+            "minLength": 16,
+            "maxLength": 512,
+            "pattern": "^\\S+$",
+            "description": "Chiave API del provider: non viene mai restituita"
+          }
+        },
+        "required": ["apiKey"]
+      },
+      "AiTestResult": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": ["USER_KEY_INVALID", "USER_KEY_QUOTA", "LLM_UNAVAILABLE"]
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": ["code", "message"]
+          }
+        },
+        "required": ["ok"]
+      },
+      "AiTestInput": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/Provider"
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^[\\w.:/@+-]+$",
+            "description": "ID del modello restituito da GET /v1/settings/ai/models"
+          },
+          "apiKey": {
+            "type": "string",
+            "minLength": 16,
+            "maxLength": 512,
+            "pattern": "^\\S+$",
+            "description": "Chiave API del provider: non viene mai restituita"
+          }
+        },
+        "required": ["provider", "model"],
+        "description": "Senza apiKey si usa la chiave salvata dell'utente per il provider."
+      },
+      "ModelList": {
+        "type": "object",
+        "properties": {
+          "models": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModelInfo"
+            }
+          }
+        },
+        "required": ["models"]
+      },
+      "ModelInfo": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "supportsImages": {
+            "type": ["boolean", "null"],
+            "description": "null se il provider non dichiara la capacità"
+          },
+          "supportsPdf": {
+            "type": ["boolean", "null"],
+            "description": "null se il provider non dichiara la capacità"
+          }
+        },
+        "required": ["id", "label", "supportsImages", "supportsPdf"]
+      },
+      "UsageSummary": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/UsageTotals"
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "description": "Giorno (YYYY-MM-DD, Europe/Rome) oppure provider/model secondo groupBy"
+                },
+                "calls": {
+                  "type": "integer"
+                },
+                "inputTokens": {
+                  "type": "integer"
+                },
+                "outputTokens": {
+                  "type": "integer"
+                },
+                "costUsd": {
+                  "type": "number",
+                  "description": "Somma dei costi noti in USD"
+                },
+                "unpricedCalls": {
+                  "type": "integer",
+                  "description": "Chiamate senza prezzo in model_prices (costo non incluso)"
+                }
+              },
+              "required": [
+                "key",
+                "calls",
+                "inputTokens",
+                "outputTokens",
+                "costUsd",
+                "unpricedCalls"
+              ]
+            },
+            "description": "Serie raggruppata secondo groupBy"
+          },
+          "byModel": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "provider": {
+                  "type": "string"
+                },
+                "model": {
+                  "type": "string"
+                },
+                "calls": {
+                  "type": "integer"
+                },
+                "inputTokens": {
+                  "type": "integer"
+                },
+                "outputTokens": {
+                  "type": "integer"
+                },
+                "costUsd": {
+                  "type": "number",
+                  "description": "Somma dei costi noti in USD"
+                },
+                "unpricedCalls": {
+                  "type": "integer",
+                  "description": "Chiamate senza prezzo in model_prices (costo non incluso)"
+                }
+              },
+              "required": [
+                "provider",
+                "model",
+                "calls",
+                "inputTokens",
+                "outputTokens",
+                "costUsd",
+                "unpricedCalls"
+              ]
+            }
+          }
+        },
+        "required": ["from", "to", "totals", "series", "byModel"]
+      },
+      "UsageTotals": {
+        "type": "object",
+        "properties": {
+          "calls": {
+            "type": "integer"
+          },
+          "inputTokens": {
+            "type": "integer"
+          },
+          "outputTokens": {
+            "type": "integer"
+          },
+          "costUsd": {
+            "type": "number",
+            "description": "Somma dei costi noti in USD"
+          },
+          "unpricedCalls": {
+            "type": "integer",
+            "description": "Chiamate senza prezzo in model_prices (costo non incluso)"
+          }
+        },
+        "required": ["calls", "inputTokens", "outputTokens", "costUsd", "unpricedCalls"]
+      },
+      "UsageCallList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UsageCall"
+            }
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["items", "nextCursor"]
+      },
+      "UsageCall": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "operation": {
+            "type": "string",
+            "enum": ["extract", "reextract", "key_test"]
+          },
+          "provider": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "keySource": {
+            "type": "string",
+            "enum": ["platform", "user"]
+          },
+          "inputTokens": {
+            "type": ["integer", "null"]
+          },
+          "outputTokens": {
+            "type": ["integer", "null"]
+          },
+          "totalTokens": {
+            "type": ["integer", "null"]
+          },
+          "costUsd": {
+            "type": ["number", "null"]
+          },
+          "latencyMs": {
+            "type": "integer"
+          },
+          "success": {
+            "type": "boolean"
+          },
+          "errorCode": {
+            "type": ["string", "null"]
+          },
+          "receiptId": {
+            "type": ["string", "null"],
+            "format": "uuid"
+          },
+          "merchantName": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": [
+          "id",
+          "createdAt",
+          "operation",
+          "provider",
+          "model",
+          "keySource",
+          "inputTokens",
+          "outputTokens",
+          "totalTokens",
+          "costUsd",
+          "latencyMs",
+          "success",
+          "errorCode",
+          "receiptId",
+          "merchantName"
+        ]
+      },
+      "Stats": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "to": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "description": "Limite superiore esclusivo, già normalizzato (inizio del giorno dopo se in query c'era la sola data)"
+          },
+          "granularity": {
+            "type": "string",
+            "enum": ["month", "year"]
+          },
+          "totals": {
+            "$ref": "#/components/schemas/StatsTotals"
+          },
+          "byCategory": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "category": {
+                  "$ref": "#/components/schemas/Category"
+                },
+                "total": {
+                  "type": "number",
+                  "description": "Somma dei totali, 2 decimali, senza conversione di valuta"
+                },
+                "nReceipts": {
+                  "type": "integer"
+                }
+              },
+              "required": ["category", "total", "nReceipts"]
+            }
+          },
+          "byPeriod": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "period": {
+                  "type": "string",
+                  "description": "YYYY-MM o YYYY (Europe/Rome)",
+                  "example": "2026-10"
+                },
+                "total": {
+                  "type": "number",
+                  "description": "Somma dei totali, 2 decimali, senza conversione di valuta"
+                },
+                "nReceipts": {
+                  "type": "integer"
+                }
+              },
+              "required": ["period", "total", "nReceipts"]
+            }
+          },
+          "topMerchants": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "merchantName": {
+                  "type": "string"
+                },
+                "total": {
+                  "type": "number",
+                  "description": "Somma dei totali, 2 decimali, senza conversione di valuta"
+                },
+                "nReceipts": {
+                  "type": "integer"
+                }
+              },
+              "required": ["merchantName", "total", "nReceipts"]
+            }
+          },
+          "bySource": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "$ref": "#/components/schemas/ReceiptSource"
+                },
+                "total": {
+                  "type": "number",
+                  "description": "Somma dei totali, 2 decimali, senza conversione di valuta"
+                },
+                "nReceipts": {
+                  "type": "integer"
+                }
+              },
+              "required": ["source", "total", "nReceipts"]
+            }
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "granularity",
+          "totals",
+          "byCategory",
+          "byPeriod",
+          "topMerchants",
+          "bySource"
+        ],
+        "description": "Statistiche sulle estrazioni correnti degli scontrini estratti"
+      },
+      "StatsTotals": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "description": "Somma dei totali, 2 decimali, senza conversione di valuta"
+          },
+          "nReceipts": {
+            "type": "integer"
+          },
+          "average": {
+            "type": "number",
+            "description": "Totale medio per scontrino, 2 decimali"
+          }
+        },
+        "required": ["total", "nReceipts", "average"]
+      }
+    },
+    "parameters": {}
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["system"],
+        "summary": "Stato del servizio",
+        "responses": {
+          "200": {
+            "description": "Il servizio è attivo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me": {
+      "get": {
+        "tags": ["account"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Utente corrente, impostazioni AI e quota della piattaforma",
+        "responses": {
+          "200": {
+            "description": "Utente corrente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Richiesta non valida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Errore interno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Servizio temporaneamente non disponibile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/account": {
+      "delete": {
+        "tags": ["account"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Cancella l'utente, i suoi file e tutti i suoi dati",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteAccountInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Account cancellato"
+          },
+          "400": {
+            "description": "Richiesta non valida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Errore interno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Servizio temporaneamente non disponibile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/receipts/upload-url": {
+      "post": {
+        "tags": ["receipts"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Crea lo scontrino e restituisce un URL firmato di upload (2 minuti)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadUrlInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "URL di upload creato",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadUrl"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Richiesta non valida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Scontrino già caricato (stesso sha256)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DuplicateError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "File troppo grande",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Errore interno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Servizio temporaneamente non disponibile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/receipts/{id}/complete": {
+      "post": {
+        "tags": ["receipts"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Conferma l'upload: ricontrolla il file e accoda l'estrazione",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Upload accettato, estrazione in coda",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Richiesta non valida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Risorsa non trovata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stato non compatibile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Il file caricato non corrisponde a quanto dichiarato",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Errore interno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Servizio temporaneamente non disponibile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/receipts/manual": {
+      "post": {
+        "tags": ["receipts"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Inserimento manuale (nessuna chiamata LLM)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualReceiptInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Scontrino creato",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Richiesta non valida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Errore interno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Servizio temporaneamente non disponibile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/receipts": {
+      "get": {
+        "tags": ["receipts"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Elenco paginato degli scontrini",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 40,
+              "example": "2026-10-04T12:30:00+02:00"
+            },
+            "required": false,
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 40,
+              "example": "2026-10-04T12:30:00+02:00"
+            },
+            "required": false,
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/ReceiptStatus"
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Category"
+            },
+            "required": false,
+            "name": "category",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/ReceiptSource"
+            },
+            "required": false,
+            "name": "source",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pagina di scontrini",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Richiesta non valida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Errore interno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Servizio temporaneamente non disponibile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/receipts/{id}": {
+      "get": {
+        "tags": ["receipts"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Dettaglio con estrazione corrente e URL firmato del file (10 minuti)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dettaglio",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Richiesta non valida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Risorsa non trovata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Errore interno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Servizio temporaneamente non disponibile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["receipts"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Cancella file, estrazioni e righe",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Cancellato"
+          },
+          "400": {
+            "description": "Richiesta non valida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Risorsa non trovata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Errore interno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Servizio temporaneamente non disponibile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/receipts/{id}/extractions": {
+      "get": {
+        "tags": ["receipts"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Storico delle estrazioni, dalla più recente",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Storico",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExtractionHistory"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Richiesta non valida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Risorsa non trovata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Errore interno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Servizio temporaneamente non disponibile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/extractions/{id}": {
+      "patch": {
+        "tags": ["receipts"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Corregge l'estrazione corrente (items sostituisce tutte le righe)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExtractionPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Estrazione aggiornata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExtractionDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Richiesta non valida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Risorsa non trovata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stato non compatibile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Errore interno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Servizio temporaneamente non disponibile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/receipts/{id}/reextract": {
+      "post": {
+        "tags": ["receipts"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Rielabora lo scontrino creando una nuova estrazione (non per source=manual)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReextractInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Rielaborazione in coda",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Richiesta non valida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Risorsa non trovata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stato non compatibile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Errore interno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Servizio temporaneamente non disponibile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/settings/ai": {
+      "get": {
+        "tags": ["settings"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Impostazioni AI, chiavi salvate (solo last4) e quota della piattaforma",
+        "responses": {
+          "200": {
+            "description": "Impostazioni AI",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiSettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Richiesta non valida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Errore interno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Servizio temporaneamente non disponibile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["settings"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Modalità (platform/byok), provider, modello e fallback sulla piattaforma",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiSettingsInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Impostazioni aggiornate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiSettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Richiesta non valida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Nessuna chiave salvata per il provider (USER_KEY_MISSING)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Errore interno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Servizio temporaneamente non disponibile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/settings/ai/keys/{provider}": {
+      "put": {
+        "tags": ["settings"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Verifica la chiave sul provider, poi la cifra e la salva",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Provider"
+            },
+            "required": true,
+            "name": "provider",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiKeyInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Chiave salvata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiKeyInfo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Richiesta non valida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Chiave rifiutata (USER_KEY_INVALID) o senza quota",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Errore interno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Provider non raggiungibile (PROVIDER_UNAVAILABLE)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Servizio temporaneamente non disponibile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["settings"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Cancella la chiave; se era in uso torna a mode=platform",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Provider"
+            },
+            "required": true,
+            "name": "provider",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Chiave cancellata"
+          },
+          "400": {
+            "description": "Richiesta non valida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Risorsa non trovata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Errore interno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Servizio temporaneamente non disponibile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/settings/ai/test": {
+      "post": {
+        "tags": ["settings"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Prova chiave e modello con una chiamata minima",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiTestInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Esito della prova",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiTestResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Richiesta non valida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Nessuna chiave salvata per il provider (USER_KEY_MISSING)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Chiave salvata non decifrabile (USER_KEY_INVALID)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Errore interno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Servizio temporaneamente non disponibile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/settings/ai/models": {
+      "get": {
+        "tags": ["settings"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Modelli del provider, caricati in tempo reale",
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Provider"
+            },
+            "required": true,
+            "name": "provider",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Modelli disponibili",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Richiesta non valida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Nessuna chiave salvata per il provider (USER_KEY_MISSING)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Chiave rifiutata (USER_KEY_INVALID) o senza quota",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Errore interno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Provider non raggiungibile (PROVIDER_UNAVAILABLE)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Servizio temporaneamente non disponibile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/usage": {
+      "get": {
+        "tags": ["usage"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Consumo LLM: totali, serie per giorno o per modello, dettaglio per modello",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 40,
+              "example": "2026-10-04T12:30:00+02:00",
+              "description": "Default: primo giorno del mese corrente"
+            },
+            "required": false,
+            "description": "Default: primo giorno del mese corrente",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 40,
+              "example": "2026-10-04T12:30:00+02:00",
+              "description": "Incluso; con la sola data comprende l'intera giornata. Default: adesso"
+            },
+            "required": false,
+            "description": "Incluso; con la sola data comprende l'intera giornata. Default: adesso",
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["day", "model"],
+              "default": "day"
+            },
+            "required": false,
+            "name": "groupBy",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Consumo nel periodo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Richiesta non valida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Errore interno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Servizio temporaneamente non disponibile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/usage/calls": {
+      "get": {
+        "tags": ["usage"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Ultime chiamate LLM con il nome dell'esercente collegato",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pagina di chiamate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageCallList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Richiesta non valida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Errore interno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Servizio temporaneamente non disponibile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/stats": {
+      "get": {
+        "tags": ["stats"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Statistiche di spesa: totali, per categoria, per periodo, esercenti e sorgente",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 40,
+              "example": "2026-10-04T12:30:00+02:00",
+              "description": "Data dello scontrino (acquisto o, se manca, caricamento) da cui partire. Default: nessun limite"
+            },
+            "required": false,
+            "description": "Data dello scontrino (acquisto o, se manca, caricamento) da cui partire. Default: nessun limite",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 40,
+              "example": "2026-10-04T12:30:00+02:00",
+              "description": "Incluso; con la sola data comprende l'intera giornata. Default: nessun limite"
+            },
+            "required": false,
+            "description": "Incluso; con la sola data comprende l'intera giornata. Default: nessun limite",
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["month", "year"],
+              "default": "month"
+            },
+            "required": false,
+            "name": "granularity",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Statistiche nel periodo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Stats"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Richiesta non valida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Errore interno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Servizio temporaneamente non disponibile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {}
+}

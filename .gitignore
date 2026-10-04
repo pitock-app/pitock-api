@@ -1,0 +1,11 @@
+.env
+.env.*
+!.env.example
+node_modules/
+dist/
+coverage/
+.vercel/
+fixtures/receipts/*
+!fixtures/receipts/README.md
+.claude/
+.autopilot/*
