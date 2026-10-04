@@ -1,6 +1,7 @@
 import { and, desc, eq, gte, ilike, lt, lte, or, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../../infra/db/client.js";
 import { extractions, receiptsRaw } from "../../infra/db/schema/index.js";
+import { timestamptz } from "../../infra/db/timestamptz.js";
 import type { Cursor } from "../../shared/pagination.js";
 
 export type ReceiptRow = typeof receiptsRaw.$inferSelect;
@@ -75,8 +76,11 @@ export function createReceiptsRepo(db: Db) {
       if (f.status) conds.push(eq(receiptsRaw.status, f.status));
       if (f.source) conds.push(eq(receiptsRaw.source, f.source));
       if (f.category) conds.push(eq(extractions.category, f.category));
-      if (f.from) conds.push(gte(when, f.from));
-      if (f.to) conds.push(f.to.exclusive ? lt(when, f.to.at) : lte(when, f.to.at));
+      if (f.from) conds.push(gte(when, timestamptz(f.from)));
+      if (f.to)
+        conds.push(
+          f.to.exclusive ? lt(when, timestamptz(f.to.at)) : lte(when, timestamptz(f.to.at)),
+        );
       if (f.q) {
         const pattern = `%${escapeLike(f.q)}%`;
         conds.push(

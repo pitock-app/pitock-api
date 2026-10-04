@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, gte, isNotNull, lt, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../../infra/db/client.js";
 import { extractions, receiptsRaw, statsMonthly } from "../../infra/db/schema/index.js";
+import { timestamptz } from "../../infra/db/timestamptz.js";
 import { DEFAULT_TIME_ZONE } from "../../shared/dates.js";
 
 export interface StatsRange {
@@ -34,8 +35,8 @@ export function createStatsRepo(db: Db) {
   /** Scontrini estratti con la loro estrazione corrente, sempre dell'utente. */
   const base = (userId: string, range: StatsRange = {}) => {
     const conds: SQL[] = [eq(receiptsRaw.userId, userId), eq(receiptsRaw.status, "extracted")];
-    if (range.from) conds.push(gte(when, range.from));
-    if (range.to) conds.push(lt(when, range.to));
+    if (range.from) conds.push(gte(when, timestamptz(range.from)));
+    if (range.to) conds.push(lt(when, timestamptz(range.to)));
     return {
       join: and(
         eq(extractions.receiptId, receiptsRaw.id),
