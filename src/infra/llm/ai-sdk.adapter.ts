@@ -12,6 +12,7 @@ import {
 } from "ai";
 import { createProviderModel, type ModelFactory } from "../../modules/ai/providers.js";
 import { LlmError, type LlmPort, type LlmUsage } from "../../ports/llm.port.js";
+import { redact } from "../../shared/redact.js";
 
 const toUsage = (u: LanguageModelUsage | undefined): LlmUsage => ({
   inputTokens: u?.inputTokens ?? null,
@@ -30,9 +31,18 @@ const FILE_HINT = /pdf|document|file|media[ _-]?type|mime|image|unsupported/i;
 /** Anthropic risponde 400 (non 402) quando il credito è esaurito. */
 const CREDIT_HINT = /credit balance/i;
 
-/** Classifica gli errori del provider senza mai riportare chiave, corpo della richiesta o risposta. */
+/** Riga di log per capire la causa (status + errore del provider), con i segreti mascherati. */
+const logProviderError = (err: unknown) => {
+  const detail = APICallError.isInstance(err)
+    ? { status: err.statusCode ?? null, body: (err.responseBody ?? err.message).slice(0, 500) }
+    : { error: err };
+  console.warn(JSON.stringify(redact({ level: 40, msg: "llm provider error", ...detail })));
+};
+
+/** Classifica gli errori del provider; il messaggio restituito non riporta chiave, richiesta o risposta. */
 export function classifyLlmError(err: unknown): LlmError {
   if (err instanceof LlmError) return err;
+  logProviderError(err);
   if (NoObjectGeneratedError.isInstance(err)) {
     return new LlmError("invalid_output", "Output del modello non valido", toUsage(err.usage));
   }
