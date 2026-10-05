@@ -123,7 +123,7 @@ const request = (mimeType: "image/jpeg" | "application/pdf", bytes: Uint8Array) 
   apiKey: "sk-ant-test-key-0000",
   instructions: "istruzioni",
   prompt: "estrai",
-  file: { bytes, mimeType },
+  files: [{ bytes, mimeType }],
   schema: ReceiptExtraction,
 });
 

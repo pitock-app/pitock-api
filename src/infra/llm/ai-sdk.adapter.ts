@@ -62,7 +62,6 @@ export function classifyLlmError(err: unknown): LlmError {
 export function createAiSdkLlm(modelFactory: ModelFactory = createProviderModel): LlmPort {
   return {
     async generateStructured(req) {
-      const isPdf = req.file.mimeType === "application/pdf";
       try {
         const result = await generateText({
           model: modelFactory(req.provider, req.model, req.apiKey),
@@ -74,12 +73,12 @@ export function createAiSdkLlm(modelFactory: ModelFactory = createProviderModel)
               role: "user",
               content: [
                 { type: "text", text: req.prompt },
-                {
-                  type: "file",
-                  mediaType: req.file.mimeType,
-                  data: req.file.bytes,
-                  ...(isPdf ? { filename: "scontrino.pdf" } : {}),
-                },
+                ...req.files.map((file) => ({
+                  type: "file" as const,
+                  mediaType: file.mimeType,
+                  data: file.bytes,
+                  ...(file.mimeType === "application/pdf" ? { filename: "scontrino.pdf" } : {}),
+                })),
               ],
             },
           ],

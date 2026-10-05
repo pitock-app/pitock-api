@@ -8,6 +8,12 @@ export interface LlmUsage {
   totalTokens: number | null;
 }
 
+/** Un file per il modello: l'immagine o il PDF dello scontrino, o una sua fascia. */
+export interface LlmFile {
+  bytes: Uint8Array;
+  mimeType: MimeType;
+}
+
 export interface LlmRequest {
   provider: Provider;
   model: string;
@@ -15,7 +21,8 @@ export interface LlmRequest {
   apiKey: string;
   instructions: string;
   prompt: string;
-  file: { bytes: Uint8Array; mimeType: MimeType };
+  /** Uno o più file dello stesso documento, in ordine (le fasce di uno scontrino lungo). */
+  files: LlmFile[];
   schema: z.ZodType;
 }
 

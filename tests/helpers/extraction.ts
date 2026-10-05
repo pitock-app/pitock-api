@@ -8,9 +8,17 @@ let fileSeq = 0;
 
 const sha = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 
-/** Il frontend: upload-url → PUT su Storage (fake) → complete. Ogni file è diverso. */
-export async function uploaded(app: TestApp, userId: string, kind: "jpeg" | "pdf" = "jpeg") {
-  const bytes = kind === "pdf" ? PDF(2048 + fileSeq++) : JPEG(2048 + fileSeq++);
+/**
+ * Il frontend: upload-url → PUT su Storage (fake) → complete. Ogni file è diverso, a meno di
+ * passare i byte (es. un'immagine vera).
+ */
+export async function uploaded(
+  app: TestApp,
+  userId: string,
+  kind: "jpeg" | "pdf" = "jpeg",
+  content?: Uint8Array,
+) {
+  const bytes = content ?? (kind === "pdf" ? PDF(2048 + fileSeq++) : JPEG(2048 + fileSeq++));
   const mimeType = kind === "pdf" ? "application/pdf" : "image/jpeg";
   const res = await app.call(userId, "POST", "/v1/receipts/upload-url", {
     source: "file",

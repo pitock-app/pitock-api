@@ -1,3 +1,4 @@
+import sharp from "sharp";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { modelPrices } from "../../src/infra/db/schema/index.js";
 import { extractReceiptJob } from "../../src/jobs/extract-receipt.job.js";
@@ -31,9 +32,9 @@ describe("extract-receipt: successo", () => {
       provider: "anthropic",
       model: "fake-model",
       apiKey: "test-platform-key",
-      file: { mimeType: "image/jpeg" },
+      files: [{ mimeType: "image/jpeg" }],
     });
-    expect(req?.file.bytes).toEqual(bytes);
+    expect(req?.files[0]?.bytes).toEqual(bytes);
 
     const d = await detail(h, user, receiptId);
     expect(d.receipt).toMatchObject({ status: "extracted", errorCode: null });
@@ -44,7 +45,7 @@ describe("extract-receipt: successo", () => {
       provider: "anthropic",
       model: "fake-model",
       keySource: "platform",
-      promptVersion: "v1",
+      promptVersion: "v2",
       purchasedAt: "2026-10-03T16:30:00.000Z",
     });
     expect(d.items.map((i) => i.description)).toEqual(["Pane", "Vino"]);
@@ -172,7 +173,27 @@ describe("extract-receipt: PDF", () => {
     const { receiptId } = await uploaded(h, user, "pdf");
     h.llm.respond({ output: validOutput(), usage: usage() });
     await runJobs(h);
-    expect(h.llm.requests[0]?.file.mimeType).toBe("application/pdf");
+    expect(h.llm.requests[0]?.files).toHaveLength(1);
+    expect(h.llm.requests[0]?.files[0]?.mimeType).toBe("application/pdf");
+    expect((await detail(h, user, receiptId)).receipt.status).toBe("extracted");
+  });
+
+  it("uno scontrino lungo arriva al modello in fasce, in una sola chiamata", async () => {
+    const user = await h.t.createUser();
+    const tall = await sharp({
+      create: { width: 800, height: 6000, channels: 3, background: "#ffffff" },
+    })
+      .jpeg()
+      .toBuffer();
+    const { receiptId } = await uploaded(h, user, "jpeg", new Uint8Array(tall));
+    h.llm.respond({ output: validOutput(), usage: usage() });
+    await runJobs(h);
+    const [req] = h.llm.requests;
+    if (!req) throw new Error("nessuna richiesta al modello");
+    expect(req.files.length).toBeGreaterThan(1);
+    expect(req.files.every((f) => f.mimeType === "image/jpeg")).toBe(true);
+    expect(req.prompt).toContain(`diviso in ${req.files.length} immagini consecutive`);
+    expect(h.llm.requests).toHaveLength(1);
     expect((await detail(h, user, receiptId)).receipt.status).toBe("extracted");
   });
 

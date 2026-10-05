@@ -1,4 +1,4 @@
-import { LlmError, type LlmPort, type LlmUsage } from "../../ports/llm.port.js";
+import { LlmError, type LlmFile, type LlmPort, type LlmUsage } from "../../ports/llm.port.js";
 import type { Clock } from "../../ports/clock.port.js";
 import type { QueueEvents, QueuePort } from "../../ports/queue.port.js";
 import type { StoragePort } from "../../ports/storage.port.js";
@@ -11,7 +11,13 @@ import { ExtractionFailure, type ExtractionErrorCode } from "./extraction-errors
 import { ReceiptExtraction } from "./extraction.schema.js";
 import type { ExtractionsRepo } from "./extractions.repo.js";
 import { postprocess } from "./postprocess.js";
-import { EXTRACTION_INSTRUCTIONS, EXTRACTION_PROMPT, PROMPT_VERSION } from "./prompts.js";
+import {
+  EXTRACTION_INSTRUCTIONS,
+  EXTRACTION_PROMPT,
+  PROMPT_VERSION,
+  tiledPrompt,
+} from "./prompts.js";
+import { splitTallImage } from "./tiles.js";
 
 /** Tentativi per l'output non valido: la prima chiamata più un retry (sezione 7). */
 export const MAX_ATTEMPTS = 2;
@@ -105,7 +111,7 @@ export function createExtractionService(d: ExtractionDeps) {
       };
 
       /** Una chiamata più un retry se l'output non supera la validazione Zod. */
-      const attempt = async (config: AiConfig, bytes: Uint8Array): Promise<Success> => {
+      const attempt = async (config: AiConfig, files: LlmFile[]): Promise<Success> => {
         for (let i = 0; i < MAX_ATTEMPTS; i++) {
           const started = d.clock.now().getTime();
           try {
@@ -114,8 +120,8 @@ export function createExtractionService(d: ExtractionDeps) {
               model: config.model,
               apiKey: config.apiKey,
               instructions: EXTRACTION_INSTRUCTIONS,
-              prompt: EXTRACTION_PROMPT,
-              file: { bytes, mimeType },
+              prompt: files.length > 1 ? tiledPrompt(files.length) : EXTRACTION_PROMPT,
+              files,
               schema: ReceiptExtraction,
             });
             const parsed = ReceiptExtraction.safeParse(res.output);
@@ -151,17 +157,19 @@ export function createExtractionService(d: ExtractionDeps) {
         } catch {
           throw new ExtractionFailure("FILE_UNAVAILABLE", "File non leggibile dallo storage");
         }
+        // Scontrini lunghi: fasce sovrapposte, altrimenti il provider li rimpicciolisce troppo.
+        const files = await splitTallImage({ bytes, mimeType });
 
         let success: Success;
         try {
-          success = await attempt(plan.primary, bytes);
+          success = await attempt(plan.primary, files);
         } catch (err) {
           const keyProblem =
             err instanceof LlmError && (err.kind === "auth" || err.kind === "quota");
           if (!(keyProblem && plan.primary.keySource === "user")) throw err;
           if (!plan.fallbackToPlatform)
             throw new ExtractionFailure(errorCodeFor(err, plan.primary), err.message);
-          success = await attempt(await d.router.platform(userId), bytes);
+          success = await attempt(await d.router.platform(userId), files);
         }
 
         const pp = postprocess(success.output);

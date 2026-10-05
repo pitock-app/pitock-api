@@ -34,6 +34,7 @@
     "jose": "^6.2.12",
     "pino": "^10.4.0",
     "postgres": "^3.4.9",
+    "sharp": "^0.35.5",
     "zod": "^4.6.5"
   },
   "devDependencies": {
