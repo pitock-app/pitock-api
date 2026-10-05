@@ -88,6 +88,7 @@ describe("classifyLlmError", () => {
     [402, "", "quota"],
     [429, "", "quota"],
     [400, '{"error":"PDF not supported"}', "unsupported_file"],
+    [400, '{"error":{"message":"Your credit balance is too low"}}', "quota"],
     [400, '{"error":"bad request"}', "unavailable"],
     [500, "", "unavailable"],
   ])("HTTP %i %s → %s", (status, body, kind) => {

@@ -27,6 +27,8 @@ const toUsage = (u: LanguageModelUsage | undefined): LlmUsage => ({
 export const PING_PROMPT = "Rispondi solo con: ok";
 
 const FILE_HINT = /pdf|document|file|media[ _-]?type|mime|image|unsupported/i;
+/** Anthropic risponde 400 (non 402) quando il credito è esaurito. */
+const CREDIT_HINT = /credit balance/i;
 
 /** Classifica gli errori del provider senza mai riportare chiave, corpo della richiesta o risposta. */
 export function classifyLlmError(err: unknown): LlmError {
@@ -50,6 +52,9 @@ export function classifyLlmError(err: unknown): LlmError {
     if (status === 401 || status === 403) return new LlmError("auth", "Chiave API non valida");
     if (status === 402 || status === 429)
       return new LlmError("quota", "Quota del provider esaurita");
+    if (status === 400 && CREDIT_HINT.test(err.responseBody ?? err.message)) {
+      return new LlmError("quota", "Quota del provider esaurita");
+    }
     if ([400, 413, 415, 422].includes(status) && FILE_HINT.test(err.responseBody ?? err.message)) {
       return new LlmError("unsupported_file", "Tipo di file non supportato dal modello");
     }
