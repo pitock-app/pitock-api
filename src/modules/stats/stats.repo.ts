@@ -73,7 +73,7 @@ export function createStatsRepo(db: Db) {
         .where(where)
         .groupBy(period)
         .orderBy(asc(period));
-      // Tutte le varianti di nome, insegna e P.IVA: l'unione e la classifica le fa il service.
+      // Totali per variante di nome, insegna e P.IVA: l'unione e la classifica le fa il service.
       const merchants = await db
         .select({
           name: extractions.merchantName,
@@ -99,6 +99,23 @@ export function createStatsRepo(db: Db) {
         merchants,
         bySource,
       };
+    },
+
+    /**
+     * Tutte le varianti di nome, insegna e P.IVA dell'utente, senza intervallo: i nomi
+     * armonizzati non devono cambiare con il periodo richiesto.
+     */
+    async merchantVariants(userId: string) {
+      const { join, where } = base(userId);
+      return db
+        .selectDistinct({
+          name: extractions.merchantName,
+          brand: extractions.merchantBrand,
+          vat: extractions.merchantVat,
+        })
+        .from(receiptsRaw)
+        .innerJoin(extractions, join)
+        .where(where);
     },
 
     /**

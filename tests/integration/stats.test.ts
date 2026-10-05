@@ -379,4 +379,29 @@ describe("negozi armonizzati", () => {
       ]),
     );
   });
+
+  it("lo stesso negozio ha lo stesso nome in ogni intervallo", async () => {
+    const c = await h.t.createUser();
+    await seedExtractedFile(h.t.db, c, {
+      merchantName: "IN'S SUPERMERCATO",
+      total: 10,
+      purchasedAt: new Date("2026-09-10T10:00:00Z"),
+    });
+    await seedExtractedFile(h.t.db, c, {
+      merchantName: "IN's supermercato",
+      total: 5,
+      purchasedAt: new Date("2026-08-10T10:00:00Z"),
+    });
+
+    // Settembre da solo contiene solo la scrittura tutta maiuscola.
+    const september = "?from=2026-09-01&to=2026-09-30";
+    const s = await getStats(c, september);
+    expect(s.topMerchants.map((m) => m.merchantName)).toEqual(["IN's supermercato"]);
+    const d = await getDataset(c, september);
+    expect(d.receipts.map((r) => r.merchantName)).toEqual(["IN's supermercato"]);
+    const all = await getDataset(c);
+    expect(new Set(all.receipts.map((r) => r.merchantName))).toEqual(
+      new Set(["IN's supermercato"]),
+    );
+  });
 });

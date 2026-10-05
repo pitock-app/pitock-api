@@ -4,7 +4,7 @@ import {
   type Category,
   type SizeUnit,
 } from "../extraction/extraction.schema.js";
-import { harmonizeMerchants } from "./merchants.js";
+import { harmonizeMerchants, type MerchantSource } from "./merchants.js";
 import { parseIsoInTimeZone, parseRangeEnd } from "../../shared/dates.js";
 import { AppError } from "../../shared/errors.js";
 import type { StatsRepo } from "./stats.repo.js";
@@ -28,27 +28,36 @@ const asSizeUnit = (u: string | null): SizeUnit | null =>
 const asCategory = (c: string): Category =>
   (CATEGORIES as readonly string[]).includes(c) ? (c as Category) : "altro";
 
+type MerchantNames = (source: MerchantSource) => string | null;
+
+const variantKey = (s: MerchantSource) => JSON.stringify([s.name, s.brand, s.vat]);
+
+/**
+ * Nomi armonizzati calcolati su tutte le varianti dell'utente: lo stesso negozio ha lo stesso
+ * nome in ogni periodo, così filtri e totali di richieste diverse coincidono.
+ */
+async function merchantNames(repo: StatsRepo, userId: string): Promise<MerchantNames> {
+  const variants = await repo.merchantVariants(userId);
+  const names = harmonizeMerchants(variants);
+  const byVariant = new Map(variants.map((v, i) => [variantKey(v), names[i] ?? null]));
+  return (source) => byVariant.get(variantKey(source)) ?? harmonizeMerchants([source])[0] ?? null;
+}
+
 /** Classifica dei negozi con i nomi armonizzati (vedi `merchants.ts`). */
 function topMerchants(
-  rows: {
-    name: string | null;
-    brand: string | null;
-    vat: string | null;
-    total: number;
-    nReceipts: number;
-  }[],
+  rows: (MerchantSource & { total: number; nReceipts: number })[],
+  nameOf: MerchantNames,
 ) {
-  const names = harmonizeMerchants(rows);
   const byName = new Map<string, { total: number; nReceipts: number }>();
-  rows.forEach((row, i) => {
-    const name = names[i];
-    if (!name) return;
+  for (const row of rows) {
+    const name = nameOf(row);
+    if (!name) continue;
     const current = byName.get(name) ?? { total: 0, nReceipts: 0 };
     byName.set(name, {
       total: current.total + row.total,
       nReceipts: current.nReceipts + row.nReceipts,
     });
-  });
+  }
   return [...byName]
     .map(([merchantName, v]) => ({ merchantName, ...v }))
     .sort((a, b) => b.total - a.total || a.merchantName.localeCompare(b.merchantName))
@@ -71,7 +80,10 @@ export function createStatsService(d: StatsDeps) {
     async summary(userId: string, q: StatsQuery) {
       const range = parseRange(q);
       const { from, to } = range;
-      const s = await d.stats.summary(userId, range, q.granularity);
+      const [s, nameOf] = await Promise.all([
+        d.stats.summary(userId, range, q.granularity),
+        merchantNames(d.stats, userId),
+      ]);
 
       // Categorie fuori elenco (dati storici) confluiscono in "altro".
       const byCategory = new Map<Category, { total: number; nReceipts: number }>();
@@ -98,7 +110,7 @@ export function createStatsService(d: StatsDeps) {
           .map(([category, v]) => amounts({ category, ...v }))
           .sort((a, b) => b.total - a.total || a.category.localeCompare(b.category)),
         byPeriod: s.byPeriod.map(amounts),
-        topMerchants: topMerchants(s.merchants).map(amounts),
+        topMerchants: topMerchants(s.merchants, nameOf).map(amounts),
         bySource: s.bySource.map(amounts),
       };
     },
@@ -106,22 +118,22 @@ export function createStatsService(d: StatsDeps) {
     /** Scontrini e righe prodotto del periodo, per le analisi di convenienza della dashboard. */
     async dataset(userId: string, q: StatsDatasetQuery) {
       const range = parseRange(q);
-      const s = await d.stats.dataset(userId, range, DATASET_LIMIT);
-      const names = harmonizeMerchants(
-        s.receipts.map((r) => ({
-          name: r.merchantName,
-          brand: r.merchantBrand,
-          vat: r.merchantVat,
-        })),
-      );
+      const [s, nameOf] = await Promise.all([
+        d.stats.dataset(userId, range, DATASET_LIMIT),
+        merchantNames(d.stats, userId),
+      ]);
       return {
         from: range.from?.toISOString() ?? null,
         to: range.to?.toISOString() ?? null,
         truncated: s.receipts.length >= DATASET_LIMIT || s.items.length >= DATASET_LIMIT,
-        receipts: s.receipts.map((r, i) => ({
+        receipts: s.receipts.map((r) => ({
           id: r.id,
           date: r.date.toISOString(),
-          merchantName: names[i] ?? null,
+          merchantName: nameOf({
+            name: r.merchantName,
+            brand: r.merchantBrand,
+            vat: r.merchantVat,
+          }),
           merchantOriginal: r.merchantName,
           total: r.total,
           category: asCategory(r.category ?? "altro"),
