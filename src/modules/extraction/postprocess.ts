@@ -16,6 +16,9 @@ export interface PostprocessResult {
 const round = (n: number | null, digits: number) =>
   n === null || !Number.isFinite(n) ? null : Number(n.toFixed(digits));
 
+/** Testo ripulito; null se vuoto o assente. */
+const clean = (text: string | null | undefined) => text?.trim() || null;
+
 const appendNote = (notes: string | null, note: string) => (notes ? `${notes}\n${note}` : note);
 
 /** Normalizza l'output del modello e ne abbassa la confidenza se i conti non tornano. */
@@ -41,6 +44,7 @@ export function postprocess(out: ReceiptExtraction): PostprocessResult {
     confidence,
     fields: {
       merchantName: out.merchant_name,
+      merchantBrand: clean(out.merchant_brand),
       merchantVat: out.merchant_vat,
       merchantAddress: out.merchant_address,
       // Senza fuso vale Europe/Rome; una data illeggibile diventa null.
@@ -59,6 +63,10 @@ export function postprocess(out: ReceiptExtraction): PostprocessResult {
       amount: round(i.amount, 2),
       vatRate: round(i.vat_rate, 2),
       category: i.category,
+      normalizedName: clean(i.normalized_name),
+      brand: clean(i.brand),
+      size: i.size && i.size > 0 ? round(i.size, 3) : null,
+      sizeUnit: i.size && i.size > 0 ? (i.size_unit ?? null) : null,
     })),
   };
 }

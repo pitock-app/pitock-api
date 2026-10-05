@@ -8,6 +8,7 @@ import {
   NullableCategory,
   NullablePaymentMethod,
   PaymentMethodSchema,
+  SIZE_UNITS,
 } from "../extraction/extraction.schema.js";
 import { EXTRACTION_ERROR_CODES } from "../extraction/extraction-errors.js";
 
@@ -59,6 +60,8 @@ export const CompleteResponse = z
 
 // ---- manuale ----
 
+const SizeUnit = z.enum(SIZE_UNITS).openapi("SizeUnit");
+
 const ItemInput = z.object({
   description: text(500),
   quantity: z.number().min(-9_999_999).max(9_999_999).optional(),
@@ -66,11 +69,19 @@ const ItemInput = z.object({
   amount: amount().optional(),
   vatRate: z.number().min(0).max(100).optional(),
   category: CategorySchema.optional(),
+  normalizedName: text(200).nullable().optional().openapi({
+    description: "Nome del prodotto senza marca né formato; il client lo rimanda invariato",
+  }),
+  brand: text(100).nullable().optional(),
+  size: z.number().positive().max(9_999_999).nullable().optional(),
+  sizeUnit: z.union([SizeUnit, z.null()]).optional(),
 });
+export type ItemInput = z.infer<typeof ItemInput>;
 
 export const ManualReceiptInput = z
   .object({
     merchantName: text(200),
+    merchantBrand: text(100).optional(),
     merchantVat: text(32).optional(),
     purchasedAt: IsoDateInput,
     currency: currency().optional(),
@@ -119,6 +130,13 @@ export const ReceiptItem = z
     amount: z.number().nullable(),
     vatRate: z.number().nullable(),
     category: NullableCategory,
+    normalizedName: z.string().nullable().openapi({
+      description:
+        'Nome del prodotto senza marca né formato ("Latte intero"), per confrontare gli acquisti',
+    }),
+    brand: z.string().nullable(),
+    size: z.number().nullable().openapi({ description: "Formato della confezione, in `sizeUnit`" }),
+    sizeUnit: z.union([SizeUnit, z.null()]),
   })
   .openapi("ReceiptItem");
 
@@ -132,6 +150,9 @@ export const ExtractionDetail = z
     keySource: z.enum(["platform", "user"]).nullable(),
     promptVersion: z.string().nullable(),
     merchantName: z.string().nullable(),
+    merchantBrand: z.string().nullable().openapi({
+      description: 'Insegna del negozio ("Lidl", "IN\'s"), distinta dalla ragione sociale',
+    }),
     merchantVat: z.string().nullable(),
     merchantAddress: z.string().nullable(),
     purchasedAt: z.iso.datetime().nullable(),
@@ -207,6 +228,7 @@ export const ReceiptListResponse = z
 export const ExtractionPatch = z
   .object({
     merchantName: text(200).nullable(),
+    merchantBrand: text(100).nullable(),
     merchantVat: text(32).nullable(),
     merchantAddress: text(500).nullable(),
     purchasedAt: IsoDateInput.nullable(),

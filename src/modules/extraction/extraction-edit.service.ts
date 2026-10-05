@@ -1,7 +1,7 @@
 import type { QueuePort } from "../../ports/queue.port.js";
 import { parseIsoInTimeZone } from "../../shared/dates.js";
 import { AppError, notFound } from "../../shared/errors.js";
-import { toExtraction } from "../receipts/receipts.mappers.js";
+import { toExtraction, toItemFields } from "../receipts/receipts.mappers.js";
 import type { ExtractionPatch } from "../receipts/receipts.schemas.js";
 import type { ExtractionFields, ExtractionsRepo } from "./extractions.repo.js";
 
@@ -28,14 +28,7 @@ export function createExtractionEditService(d: ExtractionEditDeps) {
           throw new AppError("VALIDATION_ERROR", "Data non valida");
         fields.purchasedAt = parsed;
       }
-      const newItems = items?.map((i) => ({
-        description: i.description,
-        quantity: i.quantity ?? null,
-        unitPrice: i.unitPrice ?? null,
-        amount: i.amount ?? null,
-        vatRate: i.vatRate ?? null,
-        category: i.category ?? null,
-      }));
+      const newItems = items?.map(toItemFields);
 
       const updated = await d.extractions.update(userId, id, fields, newItems);
       if (!updated) throw notFound("Estrazione");

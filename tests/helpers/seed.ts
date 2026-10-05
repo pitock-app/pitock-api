@@ -17,6 +17,8 @@ export async function seedExtractedFile(
   userId: string,
   o: {
     merchantName?: string | null;
+    merchantBrand?: string | null;
+    merchantVat?: string | null;
     createdAt?: Date;
     category?: string | null;
     total?: number | null;
@@ -52,6 +54,8 @@ export async function seedExtractedFile(
       promptVersion: "v1",
       rawJson: { is_receipt: true },
       merchantName: o.merchantName === undefined ? "Supermercato" : o.merchantName,
+      merchantBrand: o.merchantBrand ?? null,
+      merchantVat: o.merchantVat ?? null,
       purchasedAt: o.purchasedAt === undefined ? new Date("2026-09-20T10:00:00Z") : o.purchasedAt,
       total: o.total === undefined ? 12.3 : o.total,
       paymentMethod: "carta",

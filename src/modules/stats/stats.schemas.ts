@@ -1,6 +1,6 @@
 import { z } from "@hono/zod-openapi";
 import { IsoDateInput } from "../../shared/openapi.js";
-import { CategorySchema } from "../extraction/extraction.schema.js";
+import { CategorySchema, SIZE_UNITS } from "../extraction/extraction.schema.js";
 import { ReceiptSource } from "../receipts/receipts.schemas.js";
 
 export const StatsQuery = z.object({
@@ -74,7 +74,13 @@ export const StatsDatasetResponse = z
           date: z.iso.datetime().openapi({
             description: "Data d'acquisto o, se manca, di caricamento",
           }),
-          merchantName: z.string().nullable(),
+          merchantName: z.string().nullable().openapi({
+            description:
+              "Nome armonizzato del negozio: insegna o nome, unito alle altre scritture dello stesso negozio",
+          }),
+          merchantOriginal: z.string().nullable().openapi({
+            description: "Nome come letto dallo scontrino",
+          }),
           total: z.number().nullable(),
           category: CategorySchema,
           source: ReceiptSource,
@@ -92,6 +98,10 @@ export const StatsDatasetResponse = z
           category: CategorySchema.openapi({
             description: "Categoria della riga o, se manca, dello scontrino",
           }),
+          normalizedName: z.string().nullable(),
+          brand: z.string().nullable(),
+          size: z.number().nullable(),
+          sizeUnit: z.union([z.enum(SIZE_UNITS), z.null()]),
         })
         .openapi("StatsItemFact"),
     ),

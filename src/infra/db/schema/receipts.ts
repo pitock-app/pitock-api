@@ -77,6 +77,8 @@ export const extractions = pgTable(
     promptVersion: text("prompt_version"),
     rawJson: jsonb("raw_json").notNull(),
     merchantName: text("merchant_name"),
+    /** Insegna del negozio ("Lidl", "IN's"), distinta dalla ragione sociale. */
+    merchantBrand: text("merchant_brand"),
     merchantVat: text("merchant_vat"),
     merchantAddress: text("merchant_address"),
     purchasedAt: timestamp("purchased_at", { withTimezone: true }),
@@ -119,6 +121,12 @@ export const receiptItems = pgTable(
     amount: money("amount"),
     vatRate: numeric("vat_rate", { precision: 5, scale: 2, mode: "number" }),
     category: text("category"),
+    /** Nome del prodotto senza marca né formato ("Latte intero"), per confrontare gli acquisti. */
+    normalizedName: text("normalized_name"),
+    brand: text("brand"),
+    /** Formato della confezione: quantità e unità (g, kg, ml, cl, l, pz). */
+    size: numeric("size", { precision: 10, scale: 3, mode: "number" }),
+    sizeUnit: text("size_unit"),
   },
   (t) => [
     foreignKey({

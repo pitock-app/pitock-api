@@ -15,7 +15,7 @@ import {
 import { decodeCursor, toPage } from "../../shared/pagination.js";
 import type { UsageRepo } from "../usage/usage.repo.js";
 import type { ExtractionsRepo } from "../extraction/extractions.repo.js";
-import { toExtraction, toReceipt, asCategory } from "./receipts.mappers.js";
+import { toExtraction, toItemFields, toReceipt, asCategory } from "./receipts.mappers.js";
 import type { ReceiptListFilters, ReceiptsRepo } from "./receipts.repo.js";
 import type { ManualReceiptInput, ReceiptListQuery } from "./receipts.schemas.js";
 
@@ -165,6 +165,7 @@ export function createReceiptsService(d: ReceiptsDeps) {
         rawJson: input,
         fields: {
           merchantName: input.merchantName,
+          merchantBrand: input.merchantBrand?.trim() || null,
           merchantVat: input.merchantVat ?? null,
           purchasedAt: toDate(input.purchasedAt),
           currency: input.currency ?? "EUR",
@@ -174,14 +175,7 @@ export function createReceiptsService(d: ReceiptsDeps) {
           category: input.category,
           notes: input.notes ?? null,
         },
-        items: (input.items ?? []).map((i) => ({
-          description: i.description,
-          quantity: i.quantity ?? null,
-          unitPrice: i.unitPrice ?? null,
-          amount: i.amount ?? null,
-          vatRate: i.vatRate ?? null,
-          category: i.category ?? null,
-        })),
+        items: (input.items ?? []).map(toItemFields),
       });
       await d.queue.send("stats/recompute", { userId });
       return detail(userId, receipt.id);

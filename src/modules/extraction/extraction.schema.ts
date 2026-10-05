@@ -15,7 +15,11 @@ export const CATEGORIES = [
 ] as const;
 export const PAYMENT_METHODS = ["contanti", "carta", "bancomat", "altro", "sconosciuto"] as const;
 
+/** Unità del formato di una confezione. */
+export const SIZE_UNITS = ["g", "kg", "ml", "cl", "l", "pz"] as const;
+
 export type Category = (typeof CATEGORIES)[number];
+export type SizeUnit = (typeof SIZE_UNITS)[number];
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
 export const CategorySchema = z.enum(CATEGORIES).openapi("Category");
@@ -30,6 +34,9 @@ export const NullablePaymentMethod = z.union([PaymentMethodSchema, z.null()]);
 export const ReceiptExtraction = z.object({
   is_receipt: z.boolean(),
   merchant_name: z.string().nullable(),
+  // Campi aggiunti con il prompt v3: facoltativi, così un modello che non li restituisce
+  // non fa fallire l'estrazione.
+  merchant_brand: z.string().nullable().optional(),
   merchant_vat: z.string().nullable(),
   merchant_address: z.string().nullable(),
   purchased_at: z.string().nullable(), // ISO 8601; se manca il fuso → Europe/Rome
@@ -46,6 +53,10 @@ export const ReceiptExtraction = z.object({
       amount: z.number().nullable(),
       vat_rate: z.number().nullable(),
       category: z.enum(CATEGORIES).nullable(),
+      normalized_name: z.string().nullable().optional(),
+      brand: z.string().nullable().optional(),
+      size: z.number().nullable().optional(),
+      size_unit: z.enum(SIZE_UNITS).nullable().optional(),
     }),
   ),
   confidence: z.number().min(0).max(1),

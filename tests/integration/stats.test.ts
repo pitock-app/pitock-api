@@ -186,6 +186,7 @@ interface Dataset {
     id: string;
     date: string;
     merchantName: string | null;
+    merchantOriginal: string | null;
     total: number | null;
     category: string;
     source: string;
@@ -325,5 +326,57 @@ describe("GET /cron/recompute-stats", () => {
     } finally {
       await other.close();
     }
+  });
+});
+
+// In fondo: crea un utente in più, che il cron conterebbe.
+describe("negozi armonizzati", () => {
+  it("unisce le scritture dello stesso negozio in /v1/stats e nel dataset", async () => {
+    const c = await h.t.createUser();
+    const at = new Date("2026-09-10T10:00:00Z");
+    await seedExtractedFile(h.t.db, c, {
+      merchantName: "IN'S SUPERMERCATO",
+      total: 10,
+      purchasedAt: at,
+    });
+    await seedExtractedFile(h.t.db, c, {
+      merchantName: "IN's supermercato",
+      total: 5,
+      purchasedAt: at,
+    });
+    await seedExtractedFile(h.t.db, c, {
+      merchantName: "LIDL ITALIA SRL",
+      merchantBrand: "Lidl",
+      total: 7,
+      purchasedAt: at,
+    });
+    await seedExtractedFile(h.t.db, c, {
+      merchantName: "Lidl Italia S.r.l.",
+      total: 3,
+      purchasedAt: at,
+    });
+    // Stessa P.IVA valida ma nome incompatibile: resta separato.
+    await seedExtractedFile(h.t.db, c, {
+      merchantName: "Bar Centrale",
+      merchantVat: "01234567897",
+      total: 2,
+      purchasedAt: at,
+    });
+
+    const s = await getStats(c);
+    expect(s.topMerchants).toEqual([
+      { merchantName: "IN's supermercato", total: 15, nReceipts: 2 },
+      { merchantName: "Lidl", total: 10, nReceipts: 2 },
+      { merchantName: "Bar Centrale", total: 2, nReceipts: 1 },
+    ]);
+    const d = await getDataset(c);
+    const pairs = d.receipts.map((r) => [r.merchantOriginal, r.merchantName]);
+    expect(pairs).toEqual(
+      expect.arrayContaining([
+        ["IN'S SUPERMERCATO", "IN's supermercato"],
+        ["Lidl Italia S.r.l.", "Lidl"],
+        ["Bar Centrale", "Bar Centrale"],
+      ]),
+    );
   });
 });

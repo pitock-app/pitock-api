@@ -1,10 +1,13 @@
 import {
   CATEGORIES,
   PAYMENT_METHODS,
+  SIZE_UNITS,
   type Category,
   type PaymentMethod,
+  type SizeUnit,
 } from "../extraction/extraction.schema.js";
-import type { ExtractionWithItems, ItemRow } from "../extraction/extractions.repo.js";
+import type { ExtractionWithItems, ItemFields, ItemRow } from "../extraction/extractions.repo.js";
+import type { ItemInput } from "./receipts.schemas.js";
 import type { ReceiptRow } from "./receipts.repo.js";
 
 const iso = (d: Date) => d.toISOString();
@@ -39,6 +42,27 @@ export const toItem = (i: ItemRow) => ({
   amount: i.amount,
   vatRate: i.vatRate,
   category: asCategory(i.category),
+  normalizedName: i.normalizedName,
+  brand: i.brand,
+  size: i.size,
+  sizeUnit: asSizeUnit(i.sizeUnit),
+});
+
+const asSizeUnit = (v: string | null): SizeUnit | null =>
+  (SIZE_UNITS as readonly string[]).includes(v ?? "") ? (v as SizeUnit) : null;
+
+/** Riga in ingresso (form manuale o correzione) → colonne di `receipt_items`. */
+export const toItemFields = (i: ItemInput): ItemFields => ({
+  description: i.description,
+  quantity: i.quantity ?? null,
+  unitPrice: i.unitPrice ?? null,
+  amount: i.amount ?? null,
+  vatRate: i.vatRate ?? null,
+  category: i.category ?? null,
+  normalizedName: i.normalizedName?.trim() || null,
+  brand: i.brand?.trim() || null,
+  size: i.size ?? null,
+  sizeUnit: i.size ? (i.sizeUnit ?? null) : null,
 });
 
 export const toExtraction = (e: ExtractionWithItems) => ({
@@ -50,6 +74,7 @@ export const toExtraction = (e: ExtractionWithItems) => ({
   keySource: e.keySource,
   promptVersion: e.promptVersion,
   merchantName: e.merchantName,
+  merchantBrand: e.merchantBrand,
   merchantVat: e.merchantVat,
   merchantAddress: e.merchantAddress,
   purchasedAt: isoOrNull(e.purchasedAt),

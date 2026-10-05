@@ -333,6 +333,10 @@
           "merchantName": {
             "type": ["string", "null"]
           },
+          "merchantBrand": {
+            "type": ["string", "null"],
+            "description": "Insegna del negozio (\"Lidl\", \"IN's\"), distinta dalla ragione sociale"
+          },
           "merchantVat": {
             "type": ["string", "null"]
           },
@@ -404,6 +408,7 @@
           "keySource",
           "promptVersion",
           "merchantName",
+          "merchantBrand",
           "merchantVat",
           "merchantAddress",
           "purchasedAt",
@@ -474,6 +479,27 @@
                 "type": "null"
               }
             ]
+          },
+          "normalizedName": {
+            "type": ["string", "null"],
+            "description": "Nome del prodotto senza marca né formato (\"Latte intero\"), per confrontare gli acquisti"
+          },
+          "brand": {
+            "type": ["string", "null"]
+          },
+          "size": {
+            "type": ["number", "null"],
+            "description": "Formato della confezione, in `sizeUnit`"
+          },
+          "sizeUnit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SizeUnit"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -484,8 +510,16 @@
           "unitPrice",
           "amount",
           "vatRate",
-          "category"
+          "category",
+          "normalizedName",
+          "brand",
+          "size",
+          "sizeUnit"
         ]
+      },
+      "SizeUnit": {
+        "type": "string",
+        "enum": ["g", "kg", "ml", "cl", "l", "pz"]
       },
       "ManualReceiptInput": {
         "type": "object",
@@ -494,6 +528,11 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 200
+          },
+          "merchantBrand": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
           },
           "merchantVat": {
             "type": "string",
@@ -562,6 +601,32 @@
                 },
                 "category": {
                   "$ref": "#/components/schemas/Category"
+                },
+                "normalizedName": {
+                  "type": ["string", "null"],
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Nome del prodotto senza marca né formato; il client lo rimanda invariato"
+                },
+                "brand": {
+                  "type": ["string", "null"],
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "size": {
+                  "type": ["number", "null"],
+                  "exclusiveMinimum": 0,
+                  "maximum": 9999999
+                },
+                "sizeUnit": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/SizeUnit"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
               },
               "required": ["description"]
@@ -663,6 +728,11 @@
             "minLength": 1,
             "maxLength": 200
           },
+          "merchantBrand": {
+            "type": ["string", "null"],
+            "minLength": 1,
+            "maxLength": 100
+          },
           "merchantVat": {
             "type": ["string", "null"],
             "minLength": 1,
@@ -749,6 +819,32 @@
                 },
                 "category": {
                   "$ref": "#/components/schemas/Category"
+                },
+                "normalizedName": {
+                  "type": ["string", "null"],
+                  "minLength": 1,
+                  "maxLength": 200,
+                  "description": "Nome del prodotto senza marca né formato; il client lo rimanda invariato"
+                },
+                "brand": {
+                  "type": ["string", "null"],
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "size": {
+                  "type": ["number", "null"],
+                  "exclusiveMinimum": 0,
+                  "maximum": 9999999
+                },
+                "sizeUnit": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/SizeUnit"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
               },
               "required": ["description"]
@@ -1347,7 +1443,12 @@
             "description": "Data d'acquisto o, se manca, di caricamento"
           },
           "merchantName": {
-            "type": ["string", "null"]
+            "type": ["string", "null"],
+            "description": "Nome armonizzato del negozio: insegna o nome, unito alle altre scritture dello stesso negozio"
+          },
+          "merchantOriginal": {
+            "type": ["string", "null"],
+            "description": "Nome come letto dallo scontrino"
           },
           "total": {
             "type": ["number", "null"]
@@ -1359,7 +1460,15 @@
             "$ref": "#/components/schemas/ReceiptSource"
           }
         },
-        "required": ["id", "date", "merchantName", "total", "category", "source"]
+        "required": [
+          "id",
+          "date",
+          "merchantName",
+          "merchantOriginal",
+          "total",
+          "category",
+          "source"
+        ]
       },
       "StatsItemFact": {
         "type": "object",
@@ -1389,9 +1498,40 @@
                 "description": "Categoria della riga o, se manca, dello scontrino"
               }
             ]
+          },
+          "normalizedName": {
+            "type": ["string", "null"]
+          },
+          "brand": {
+            "type": ["string", "null"]
+          },
+          "size": {
+            "type": ["number", "null"]
+          },
+          "sizeUnit": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": ["g", "kg", "ml", "cl", "l", "pz"]
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
-        "required": ["receiptId", "description", "quantity", "unitPrice", "amount", "category"]
+        "required": [
+          "receiptId",
+          "description",
+          "quantity",
+          "unitPrice",
+          "amount",
+          "category",
+          "normalizedName",
+          "brand",
+          "size",
+          "sizeUnit"
+        ]
       }
     },
     "parameters": {}

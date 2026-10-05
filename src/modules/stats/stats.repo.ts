@@ -53,7 +53,7 @@ export function createStatsRepo(db: Db) {
   };
 
   return {
-    async summary(userId: string, range: StatsRange, granularity: Granularity, topN: number) {
+    async summary(userId: string, range: StatsRange, granularity: Granularity) {
       const { join, where } = base(userId, range);
       const from = () => db.select(aggregates).from(receiptsRaw).innerJoin(extractions, join);
 
@@ -73,14 +73,18 @@ export function createStatsRepo(db: Db) {
         .where(where)
         .groupBy(period)
         .orderBy(asc(period));
-      const topMerchants = await db
-        .select({ merchantName: sql<string>`${extractions.merchantName}`, ...aggregates })
+      // Tutte le varianti di nome, insegna e P.IVA: l'unione e la classifica le fa il service.
+      const merchants = await db
+        .select({
+          name: extractions.merchantName,
+          brand: extractions.merchantBrand,
+          vat: extractions.merchantVat,
+          ...aggregates,
+        })
         .from(receiptsRaw)
         .innerJoin(extractions, join)
         .where(and(where, isNotNull(extractions.merchantName)))
-        .groupBy(extractions.merchantName)
-        .orderBy(desc(aggregates.total), asc(extractions.merchantName))
-        .limit(topN);
+        .groupBy(extractions.merchantName, extractions.merchantBrand, extractions.merchantVat);
       const bySource = await db
         .select({ source: receiptsRaw.source, ...aggregates })
         .from(receiptsRaw)
@@ -92,7 +96,7 @@ export function createStatsRepo(db: Db) {
         totals: totals ?? { total: 0, nReceipts: 0 },
         byCategory,
         byPeriod,
-        topMerchants,
+        merchants,
         bySource,
       };
     },
@@ -110,6 +114,8 @@ export function createStatsRepo(db: Db) {
           // Copia di `when`: `mapWith` modifica l'espressione su cui è chiamato.
           date: sql<Date>`${when}`.mapWith((v: string | Date) => new Date(v)),
           merchantName: extractions.merchantName,
+          merchantBrand: extractions.merchantBrand,
+          merchantVat: extractions.merchantVat,
           total: extractions.total,
           category: extractions.category,
           source: receiptsRaw.source,
@@ -127,6 +133,10 @@ export function createStatsRepo(db: Db) {
           unitPrice: receiptItems.unitPrice,
           amount: receiptItems.amount,
           category: sql<string | null>`coalesce(${receiptItems.category}, ${extractions.category})`,
+          normalizedName: receiptItems.normalizedName,
+          brand: receiptItems.brand,
+          size: receiptItems.size,
+          sizeUnit: receiptItems.sizeUnit,
         })
         .from(receiptsRaw)
         .innerJoin(extractions, join)

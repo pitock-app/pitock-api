@@ -45,7 +45,7 @@ describe("extract-receipt: successo", () => {
       provider: "anthropic",
       model: "fake-model",
       keySource: "platform",
-      promptVersion: "v2",
+      promptVersion: "v3",
       purchasedAt: "2026-10-03T16:30:00.000Z",
     });
     expect(d.items.map((i) => i.description)).toEqual(["Pane", "Vino"]);
@@ -176,6 +176,79 @@ describe("extract-receipt: PDF", () => {
     expect(h.llm.requests[0]?.files).toHaveLength(1);
     expect(h.llm.requests[0]?.files[0]?.mimeType).toBe("application/pdf");
     expect((await detail(h, user, receiptId)).receipt.status).toBe("extracted");
+  });
+
+  it("salva insegna e prodotti normalizzati e li conserva quando si corregge", async () => {
+    const user = await h.t.createUser();
+    const { receiptId } = await uploaded(h, user);
+    h.llm.respond({
+      output: validOutput({
+        merchant_name: "LIDL ITALIA S.R.L.",
+        merchant_brand: " Lidl ",
+        items: [
+          {
+            description: "LATTE PS UHT 1L GRANAR",
+            quantity: 1,
+            unit_price: 1.5,
+            amount: 1.5,
+            vat_rate: 4,
+            category: "alimentari",
+            normalized_name: "Latte parzialmente scremato UHT",
+            brand: "Granarolo",
+            size: 1,
+            size_unit: "l",
+          },
+          // Un modello che non restituisce i campi nuovi non fa fallire l'estrazione.
+          {
+            description: "Pane",
+            quantity: 1,
+            unit_price: 10.8,
+            amount: 10.8,
+            vat_rate: 4,
+            category: null,
+          },
+        ],
+      }),
+      usage: usage(),
+    });
+    await runJobs(h);
+    const d = await detail(h, user, receiptId);
+    expect(d.extraction).toMatchObject({
+      merchantName: "LIDL ITALIA S.R.L.",
+      merchantBrand: "Lidl",
+    });
+    const items = (d.extraction as unknown as { id: string; items: Record<string, unknown>[] })
+      .items;
+    expect(items[0]).toMatchObject({
+      normalizedName: "Latte parzialmente scremato UHT",
+      brand: "Granarolo",
+      size: 1,
+      sizeUnit: "l",
+    });
+    expect(items[1]).toMatchObject({
+      normalizedName: null,
+      brand: null,
+      size: null,
+      sizeUnit: null,
+    });
+
+    const id = (d.extraction as unknown as { id: string }).id;
+    const patch = await h.call(user, "PATCH", `/v1/extractions/${id}`, {
+      merchantBrand: "Lidl",
+      // Come il frontend: rimanda le righe senza id e posizione, senza i campi null.
+      items: items.map((item) =>
+        Object.fromEntries(
+          Object.entries(item).filter(([k, v]) => v !== null && k !== "id" && k !== "position"),
+        ),
+      ),
+    });
+    expect(patch.status).toBe(200);
+    const updated = await json<{ merchantBrand: string; items: Record<string, unknown>[] }>(patch);
+    expect(updated.merchantBrand).toBe("Lidl");
+    expect(updated.items[0]).toMatchObject({
+      normalizedName: "Latte parzialmente scremato UHT",
+      size: 1,
+    });
   });
 
   it("uno scontrino lungo arriva al modello in fasce, in una sola chiamata", async () => {

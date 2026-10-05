@@ -11,6 +11,7 @@ export type ExtractionFields = Partial<
   Pick<
     ExtractionRow,
     | "merchantName"
+    | "merchantBrand"
     | "merchantVat"
     | "merchantAddress"
     | "purchasedAt"
@@ -25,7 +26,16 @@ export type ExtractionFields = Partial<
 
 export type ItemFields = Pick<
   ItemRow,
-  "description" | "quantity" | "unitPrice" | "amount" | "vatRate" | "category"
+  | "description"
+  | "quantity"
+  | "unitPrice"
+  | "amount"
+  | "vatRate"
+  | "category"
+  | "normalizedName"
+  | "brand"
+  | "size"
+  | "sizeUnit"
 >;
 
 export interface ManualReceiptValues {
