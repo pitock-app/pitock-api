@@ -60,7 +60,8 @@ export const ReceiptExtraction = z.object({
     }),
   ),
   confidence: z.number().min(0).max(1),
-  notes: z.string().nullable(),
+  // Stringa vuota = nessuna nota. Non nullable: Anthropic accetta al massimo 16 campi con unioni.
+  notes: z.string(),
 });
 
 export type ReceiptExtraction = z.infer<typeof ReceiptExtraction>;

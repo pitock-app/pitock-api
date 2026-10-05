@@ -5,7 +5,7 @@ export const EXTRACTION_INSTRUCTIONS =
   "Restituisci solo i dati richiesti dallo schema. Non inventare: se un dato non è leggibile usa null. " +
   "Gli importi sono numeri con il punto decimale. " +
   "Se il documento non è uno scontrino o una ricevuta imposta is_receipt=false. " +
-  "`confidence` indica quanto sei sicuro dell'intera lettura. " +
+  "`confidence` indica quanto sei sicuro dell'intera lettura; `notes` è una stringa vuota se non hai nulla da segnalare. " +
   "Uno scontrino lungo può arrivare fotografato a pezzi e unito in verticale, con una fascia " +
   "grigia tra un pezzo e l'altro: le righe ripetute subito sopra e sotto la fascia sono la " +
   "stessa riga e vanno riportate una sola volta. " +

@@ -24,7 +24,7 @@ const appendNote = (notes: string | null, note: string) => (notes ? `${notes}\n$
 /** Normalizza l'output del modello e ne abbassa la confidenza se i conti non tornano. */
 export function postprocess(out: ReceiptExtraction): PostprocessResult {
   let confidence = out.confidence;
-  let notes = out.notes;
+  let notes = out.notes || null;
   const total = round(out.total, 2);
 
   const amounts = out.items.map((i) => i.amount).filter((a): a is number => a !== null);

@@ -169,7 +169,7 @@ export const validOutput = (o: Record<string, unknown> = {}) => ({
     { description: "Vino", quantity: 1, unit_price: 10, amount: 10, vat_rate: 22, category: null },
   ],
   confidence: 0.92,
-  notes: null,
+  notes: "",
   ...o,
 });
 

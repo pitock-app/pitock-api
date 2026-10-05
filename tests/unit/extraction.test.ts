@@ -1,6 +1,7 @@
 import { APICallError, UnsupportedFunctionalityError } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import { inngestDevMode, inngestServable } from "../../src/infra/queue/inngest.client.js";
 import { classifyLlmError, createAiSdkLlm } from "../../src/infra/llm/ai-sdk.adapter.js";
 import { ReceiptExtraction } from "../../src/modules/extraction/extraction.schema.js";
@@ -80,6 +81,12 @@ const apiError = (statusCode: number, responseBody = "") =>
     statusCode,
     responseBody,
   });
+
+it("lo schema resta entro il limite Anthropic di 16 campi con unioni", () => {
+  const json = JSON.stringify(z.toJSONSchema(ReceiptExtraction));
+  const unions = (json.match(/"anyOf"|"type":\[/g) ?? []).length;
+  expect(unions).toBeLessThanOrEqual(16);
+});
 
 describe("classifyLlmError", () => {
   it.each([
