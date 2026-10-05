@@ -178,6 +178,72 @@ describe("GET /v1/stats", () => {
   });
 });
 
+interface Dataset {
+  from: string | null;
+  to: string | null;
+  truncated: boolean;
+  receipts: {
+    id: string;
+    date: string;
+    merchantName: string | null;
+    total: number | null;
+    category: string;
+    source: string;
+  }[];
+  items: { receiptId: string; description: string; amount: number | null; category: string }[];
+}
+
+const getDataset = async (userId: string, query = "") => {
+  const res = await h.call(userId, "GET", `/v1/stats/dataset${query}`);
+  expect(res.status).toBe(200);
+  return json<Dataset>(res);
+};
+
+describe("GET /v1/stats/dataset", () => {
+  it("restituisce scontrini e righe delle estrazioni correnti, dal più recente", async () => {
+    const d = await getDataset(a);
+    expect(d.truncated).toBe(false);
+    // Esclusi lo scontrino fallito e l'estrazione non corrente ("Vecchia lettura").
+    expect(d.receipts.map((r) => r.merchantName)).toEqual([
+      "Bar Sport",
+      "Supermercato",
+      "Supermercato",
+      null,
+    ]);
+    expect(d.receipts.map((r) => r.date)).toEqual(
+      [...d.receipts.map((r) => r.date)].sort().reverse(),
+    );
+    const sum = d.receipts.reduce((acc, r) => acc + (r.total ?? 0), 0);
+    expect(sum).toBeCloseTo((await getStats(a)).totals.total, 2);
+    // Senza categoria né nello scontrino né nella riga: "altro".
+    expect(d.receipts.at(-1)).toMatchObject({ category: "altro", source: "file", total: 7 });
+    expect(d.items).toHaveLength(3);
+    expect(d.items.map((i) => i.category)).toEqual(["alimentari", "alimentari", "altro"]);
+    const ids = new Set(d.receipts.map((r) => r.id));
+    expect(d.items.every((i) => ids.has(i.receiptId))).toBe(true);
+  });
+
+  it("filtra per intervallo come /v1/stats", async () => {
+    const d = await getDataset(a, "?from=2026-10-01&to=2026-10-31");
+    expect(d.from).toBe("2026-09-30T22:00:00.000Z");
+    expect(d.to).toBe("2026-10-31T23:00:00.000Z");
+    expect(d.receipts.map((r) => r.id)).toContain(lateSeptemberId);
+    expect(d.receipts).toHaveLength(2);
+    expect(d.items).toEqual([
+      expect.objectContaining({ receiptId: lateSeptemberId, description: "Pane", amount: 12.3 }),
+    ]);
+    const res = await h.call(a, "GET", "/v1/stats/dataset?from=2026-10-02&to=2026-10-01");
+    expect(res.status).toBe(400);
+  });
+
+  it("ogni utente vede solo i propri dati e serve l'autenticazione", async () => {
+    const d = await getDataset(b);
+    expect(d.receipts.map((r) => r.merchantName)).toEqual(["Negozio di B"]);
+    expect(d.items).toHaveLength(1);
+    expect((await h.app.request("/v1/stats/dataset")).status).toBe(401);
+  });
+});
+
 describe("recompute-stats", () => {
   it("il job riscrive stats_monthly con i totali delle estrazioni correnti", async () => {
     const job = recomputeStatsJob(h.container.stats);

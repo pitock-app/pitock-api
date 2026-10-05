@@ -2,7 +2,7 @@ import { CATEGORIES, type Category } from "../extraction/extraction.schema.js";
 import { parseIsoInTimeZone, parseRangeEnd } from "../../shared/dates.js";
 import { AppError } from "../../shared/errors.js";
 import type { StatsRepo } from "./stats.repo.js";
-import type { StatsQuery } from "./stats.schemas.js";
+import type { StatsDatasetQuery, StatsQuery } from "./stats.schemas.js";
 
 export interface StatsDeps {
   stats: StatsRepo;
@@ -11,26 +11,31 @@ export interface StatsDeps {
 /** Esercenti restituiti da `topMerchants`. */
 export const TOP_MERCHANTS = 10;
 
+/** Massimo di scontrini e di righe restituiti da `/v1/stats/dataset`. */
+export const DATASET_LIMIT = 5000;
+
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 const asCategory = (c: string): Category =>
   (CATEGORIES as readonly string[]).includes(c) ? (c as Category) : "altro";
 
-/** Statistiche di spesa (`/v1/stats`) e ricalcolo di `stats_monthly`. */
+/** Intervallo della query: `to` diventa esclusivo. Errore se le date non sono valide. */
+function parseRange(q: { from?: string; to?: string }) {
+  const from = q.from ? parseIsoInTimeZone(q.from) : undefined;
+  const to = q.to ? parseRangeEnd(q.to) : undefined;
+  if (from === null || to === null || (from && to && from >= to)) {
+    throw new AppError("VALIDATION_ERROR", "Intervallo di date non valido");
+  }
+  return { ...(from ? { from } : {}), ...(to ? { to } : {}) };
+}
+
+/** Statistiche di spesa (`/v1/stats`, `/v1/stats/dataset`) e ricalcolo di `stats_monthly`. */
 export function createStatsService(d: StatsDeps) {
   return {
     async summary(userId: string, q: StatsQuery) {
-      const from = q.from ? parseIsoInTimeZone(q.from) : undefined;
-      const to = q.to ? parseRangeEnd(q.to) : undefined;
-      if (from === null || to === null || (from && to && from >= to)) {
-        throw new AppError("VALIDATION_ERROR", "Intervallo di date non valido");
-      }
-      const s = await d.stats.summary(
-        userId,
-        { ...(from ? { from } : {}), ...(to ? { to } : {}) },
-        q.granularity,
-        TOP_MERCHANTS,
-      );
+      const range = parseRange(q);
+      const { from, to } = range;
+      const s = await d.stats.summary(userId, range, q.granularity, TOP_MERCHANTS);
 
       // Categorie fuori elenco (dati storici) confluiscono in "altro".
       const byCategory = new Map<Category, { total: number; nReceipts: number }>();
@@ -59,6 +64,23 @@ export function createStatsService(d: StatsDeps) {
         byPeriod: s.byPeriod.map(amounts),
         topMerchants: s.topMerchants.map(amounts),
         bySource: s.bySource.map(amounts),
+      };
+    },
+
+    /** Scontrini e righe prodotto del periodo, per le analisi di convenienza della dashboard. */
+    async dataset(userId: string, q: StatsDatasetQuery) {
+      const range = parseRange(q);
+      const s = await d.stats.dataset(userId, range, DATASET_LIMIT);
+      return {
+        from: range.from?.toISOString() ?? null,
+        to: range.to?.toISOString() ?? null,
+        truncated: s.receipts.length >= DATASET_LIMIT || s.items.length >= DATASET_LIMIT,
+        receipts: s.receipts.map((r) => ({
+          ...r,
+          date: r.date.toISOString(),
+          category: asCategory(r.category ?? "altro"),
+        })),
+        items: s.items.map((i) => ({ ...i, category: asCategory(i.category ?? "altro") })),
       };
     },
 

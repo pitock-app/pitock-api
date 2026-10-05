@@ -53,3 +53,50 @@ export const StatsResponse = z
   .openapi("Stats", {
     description: "Statistiche sulle estrazioni correnti degli scontrini estratti",
   });
+
+export const StatsDatasetQuery = StatsQuery.omit({ granularity: true });
+export type StatsDatasetQuery = z.infer<typeof StatsDatasetQuery>;
+
+export const StatsDatasetResponse = z
+  .object({
+    from: z.iso.datetime().nullable(),
+    to: z.iso.datetime().nullable().openapi({
+      description: "Limite superiore esclusivo, già normalizzato come in /v1/stats",
+    }),
+    truncated: z.boolean().openapi({
+      description:
+        "Vero se uno dei due elenchi supera il limite ed è stato tagliato ai più recenti",
+    }),
+    receipts: z.array(
+      z
+        .object({
+          id: z.uuid(),
+          date: z.iso.datetime().openapi({
+            description: "Data d'acquisto o, se manca, di caricamento",
+          }),
+          merchantName: z.string().nullable(),
+          total: z.number().nullable(),
+          category: CategorySchema,
+          source: ReceiptSource,
+        })
+        .openapi("StatsReceiptFact"),
+    ),
+    items: z.array(
+      z
+        .object({
+          receiptId: z.uuid(),
+          description: z.string(),
+          quantity: z.number().nullable(),
+          unitPrice: z.number().nullable(),
+          amount: z.number().nullable(),
+          category: CategorySchema.openapi({
+            description: "Categoria della riga o, se manca, dello scontrino",
+          }),
+        })
+        .openapi("StatsItemFact"),
+    ),
+  })
+  .openapi("StatsDataset", {
+    description:
+      "Scontrini e righe prodotto del periodo (estrazioni correnti degli scontrini estratti), dal più recente",
+  });

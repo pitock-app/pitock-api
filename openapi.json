@@ -1301,6 +1301,97 @@
           }
         },
         "required": ["total", "nReceipts", "average"]
+      },
+      "StatsDataset": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "to": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "description": "Limite superiore esclusivo, già normalizzato come in /v1/stats"
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "Vero se uno dei due elenchi supera il limite ed è stato tagliato ai più recenti"
+          },
+          "receipts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsReceiptFact"
+            }
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsItemFact"
+            }
+          }
+        },
+        "required": ["from", "to", "truncated", "receipts", "items"],
+        "description": "Scontrini e righe prodotto del periodo (estrazioni correnti degli scontrini estratti), dal più recente"
+      },
+      "StatsReceiptFact": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Data d'acquisto o, se manca, di caricamento"
+          },
+          "merchantName": {
+            "type": ["string", "null"]
+          },
+          "total": {
+            "type": ["number", "null"]
+          },
+          "category": {
+            "$ref": "#/components/schemas/Category"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ReceiptSource"
+          }
+        },
+        "required": ["id", "date", "merchantName", "total", "category", "source"]
+      },
+      "StatsItemFact": {
+        "type": "object",
+        "properties": {
+          "receiptId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": ["number", "null"]
+          },
+          "unitPrice": {
+            "type": ["number", "null"]
+          },
+          "amount": {
+            "type": ["number", "null"]
+          },
+          "category": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Category"
+              },
+              {
+                "description": "Categoria della riga o, se manca, dello scontrino"
+              }
+            ]
+          }
+        },
+        "required": ["receiptId", "description", "quantity", "unitPrice", "amount", "category"]
       }
     },
     "parameters": {}
@@ -3256,6 +3347,105 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Stats"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Richiesta non valida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Errore interno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Servizio temporaneamente non disponibile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/stats/dataset": {
+      "get": {
+        "tags": ["stats"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Scontrini e righe prodotto del periodo, per le analisi per prodotto",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 40,
+              "example": "2026-10-04T12:30:00+02:00",
+              "description": "Data dello scontrino (acquisto o, se manca, caricamento) da cui partire. Default: nessun limite"
+            },
+            "required": false,
+            "description": "Data dello scontrino (acquisto o, se manca, caricamento) da cui partire. Default: nessun limite",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 40,
+              "example": "2026-10-04T12:30:00+02:00",
+              "description": "Incluso; con la sola data comprende l'intera giornata. Default: nessun limite"
+            },
+            "required": false,
+            "description": "Incluso; con la sola data comprende l'intera giornata. Default: nessun limite",
+            "name": "to",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Scontrini e righe del periodo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsDataset"
                 }
               }
             }

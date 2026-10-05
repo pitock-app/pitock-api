@@ -1,6 +1,11 @@
 import { and, asc, desc, eq, gte, isNotNull, lt, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../../infra/db/client.js";
-import { extractions, receiptsRaw, statsMonthly } from "../../infra/db/schema/index.js";
+import {
+  extractions,
+  receiptItems,
+  receiptsRaw,
+  statsMonthly,
+} from "../../infra/db/schema/index.js";
 import { timestamptz } from "../../infra/db/timestamptz.js";
 import { DEFAULT_TIME_ZONE } from "../../shared/dates.js";
 
@@ -90,6 +95,49 @@ export function createStatsRepo(db: Db) {
         topMerchants,
         bySource,
       };
+    },
+
+    /**
+     * Scontrini e righe del periodo, una riga per scontrino e una per prodotto, dal più
+     * recente. `limit` vale per ciascuno dei due elenchi: chi riceve `limit` righe sa che
+     * l'elenco è troncato.
+     */
+    async dataset(userId: string, range: StatsRange, limit: number) {
+      const { join, where } = base(userId, range);
+      const receipts = await db
+        .select({
+          id: receiptsRaw.id,
+          // Copia di `when`: `mapWith` modifica l'espressione su cui è chiamato.
+          date: sql<Date>`${when}`.mapWith((v: string | Date) => new Date(v)),
+          merchantName: extractions.merchantName,
+          total: extractions.total,
+          category: extractions.category,
+          source: receiptsRaw.source,
+        })
+        .from(receiptsRaw)
+        .innerJoin(extractions, join)
+        .where(where)
+        .orderBy(desc(when), asc(receiptsRaw.id))
+        .limit(limit);
+      const items = await db
+        .select({
+          receiptId: receiptsRaw.id,
+          description: receiptItems.description,
+          quantity: receiptItems.quantity,
+          unitPrice: receiptItems.unitPrice,
+          amount: receiptItems.amount,
+          category: sql<string | null>`coalesce(${receiptItems.category}, ${extractions.category})`,
+        })
+        .from(receiptsRaw)
+        .innerJoin(extractions, join)
+        .innerJoin(
+          receiptItems,
+          and(eq(receiptItems.extractionId, extractions.id), eq(receiptItems.userId, userId)),
+        )
+        .where(where)
+        .orderBy(desc(when), asc(receiptsRaw.id), asc(receiptItems.position))
+        .limit(limit);
+      return { receipts, items };
     },
 
     /**
