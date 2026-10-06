@@ -18,7 +18,8 @@
     "db:migrate": "tsx --env-file-if-exists=.env scripts/migrate.ts",
     "openapi:export": "tsx scripts/export-openapi.ts && prettier --write openapi.json",
     "inngest:dev": "pnpm dlx inngest-cli@latest dev -u http://localhost:8787/api/inngest",
-    "simulate:upload": "tsx --env-file-if-exists=.env scripts/simulate-upload.ts"
+    "simulate:upload": "tsx --env-file-if-exists=.env scripts/simulate-upload.ts",
+    "seed:demo": "tsx --env-file-if-exists=.env scripts/seed-demo.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.71",

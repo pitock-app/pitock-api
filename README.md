@@ -33,6 +33,7 @@ In sviluppo e test il server parte anche senza `DATABASE_URL` e senza segreti; i
 | `pnpm openapi:export`   | scrive `openapi.json` nella root       |
 | `pnpm inngest:dev`      | Dev Server Inngest su `/api/inngest`   |
 | `pnpm simulate:upload`  | simula il frontend su file o cartelle  |
+| `pnpm seed:demo`        | utente demo con un anno di spese       |
 
 ## Database
 
