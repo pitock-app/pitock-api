@@ -45,7 +45,7 @@ describe("extract-receipt: successo", () => {
       provider: "anthropic",
       model: "fake-model",
       keySource: "platform",
-      promptVersion: "v3",
+      promptVersion: "v4",
       purchasedAt: "2026-10-03T16:30:00.000Z",
     });
     expect(d.items.map((i) => i.description)).toEqual(["Pane", "Vino"]);

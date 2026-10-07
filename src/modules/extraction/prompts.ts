@@ -1,8 +1,8 @@
-export const PROMPT_VERSION = "v3";
+export const PROMPT_VERSION = "v4";
 
 export const EXTRACTION_INSTRUCTIONS =
   "Sei un estrattore di dati da scontrini e ricevute italiane. Ricevi un'immagine, un PDF o più immagini consecutive dello stesso scontrino. " +
-  "Restituisci solo i dati richiesti dallo schema. Non inventare: se un dato non è leggibile usa null. " +
+  "Restituisci solo i dati richiesti dallo schema. Non trascrivere mai codici fiscali, nomi di persone o numeri di carte: omettili ovunque. Non inventare: se un dato non è leggibile usa null. " +
   "Gli importi sono numeri con il punto decimale. " +
   "Se il documento non è uno scontrino o una ricevuta imposta is_receipt=false. " +
   "`confidence` indica quanto sei sicuro dell'intera lettura; `notes` è una stringa vuota se non hai nulla da segnalare. " +

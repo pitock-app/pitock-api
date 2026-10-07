@@ -279,3 +279,4 @@ The daily cron is declared in [`vercel.json`](./vercel.json).
 ## 📄 License
 
 Released under the [MIT License](./LICENSE) © 2026 Michele Cocca.
+The "Pitock" name and logo are not covered by the license.
