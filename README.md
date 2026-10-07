@@ -189,7 +189,7 @@ The backend owns the foundations they rely on.
 **Receipt date.** Every receipt $r$ is placed in time by
 
 $$
-d(r) = \operatorname{coalesce}\big(\text{purchasedAt}(r),\ \text{createdAt}(r)\big)
+d(r) = \mathrm{coalesce}\big(\text{purchasedAt}(r),\ \text{createdAt}(r)\big)
 $$
 
 and grouped by period in the `Europe/Rome` time zone (`YYYY-MM` or `YYYY`). Only receipts with
