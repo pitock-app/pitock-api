@@ -11,6 +11,7 @@ export const CATEGORIES = [
   "tecnologia",
   "svago",
   "servizi",
+  "igiene",
   "altro",
 ] as const;
 export const PAYMENT_METHODS = ["contanti", "carta", "bancomat", "altro", "sconosciuto"] as const;

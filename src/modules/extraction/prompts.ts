@@ -1,4 +1,4 @@
-export const PROMPT_VERSION = "v4";
+export const PROMPT_VERSION = "v7";
 
 export const EXTRACTION_INSTRUCTIONS =
   "Sei un estrattore di dati da scontrini e ricevute italiane. Ricevi un'immagine, un PDF o più immagini consecutive dello stesso scontrino. " +
@@ -16,7 +16,22 @@ export const EXTRACTION_INSTRUCTIONS =
   'italiano corrente, al singolare, senza marca, formato né abbreviazioni (es. "LATTE PS UHT 1L GRANAROLO" → ' +
   '"Latte parzialmente scremato UHT"), così lo stesso prodotto ha lo stesso nome in negozi diversi; ' +
   '`brand` è la marca se si legge; `size` e `size_unit` sono il formato della confezione (500 g → 500, "g"). ' +
-  "Per sconti, buoni, sacchetti e righe non di prodotto lascia null questi quattro campi.";
+  "Per sconti, buoni, sacchetti e righe non di prodotto lascia null questi quattro campi. " +
+  "Ogni riga di prodotto ha sempre `category`, scelta in base al prodotto e non al negozio " +
+  "(un detersivo comprato al supermercato è casa, un farmaco da banco è salute): " +
+  "alimentari = cibo e bevande da consumare a casa, anche prodotti per animali; " +
+  "ristorazione = pasti e bevande consumati fuori (bar, ristorante, asporto); " +
+  "trasporti = biglietti, pedaggi, parcheggi, taxi; carburante = benzina, gasolio, GPL, ricarica elettrica; " +
+  "salute = farmaci, parafarmaci, visite; casa = pulizia, igiene della casa, casalinghi, bricolage, arredo; " +
+  "abbigliamento = vestiti, scarpe, accessori; tecnologia = elettronica, informatica, accessori elettronici; " +
+  "svago = libri, giochi, sport, spettacoli, hobby; servizi = ricariche, abbonamenti, riparazioni, " +
+  "lavanderia, cura della persona dal parrucchiere; igiene = igiene personale e cosmetici (sapone, shampoo, dentifricio, assorbenti, rasoi, trucco); altro = tutto ciò che non rientra. " +
+  "Per sconti, buoni, sacchetti e righe non di prodotto `category` è null. " +
+  "Gli importi delle righe sono quelli effettivamente pagati: uno sconto, un'offerta o un buono " +
+  'stampato sotto un prodotto (es. "SCONTO 20%", "PROMO -0,50") va sottratto dalla riga di quel ' +
+  "prodotto, con `amount` al netto dello sconto e `unit_price` = `amount` / `quantity`, e non va " +
+  "riportato come riga a sé. Solo gli sconti sul totale che non riguardano un singolo prodotto " +
+  "restano una riga separata con importo negativo.";
 
 export const EXTRACTION_PROMPT = "Estrai i dati di questo documento.";
 
