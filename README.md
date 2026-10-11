@@ -66,6 +66,7 @@ flowchart LR
 - **Three ways in**: `camera`, `file` (images or PDF, many at once) and `manual` (form data _is_ the extraction).
 - **Raw first**: the original file is always stored and never modified; every extraction points to it with a foreign key and keeps a full history.
 - **LLM extraction** with a Zod schema: merchant, VAT number, date, total, taxes, payment method, category and every line item with normalized name, brand and pack size.
+- **Avoidability**: every product line and every receipt is tagged `essenziale`, `utile` or `superfluo`, so the web app can show how much spending could have been avoided.
 - **Bring your own key (BYOK)**: use the platform model with a monthly quota, or your own Anthropic / OpenAI / OpenRouter key (AES-256-GCM encrypted, only `last4` ever returned), with optional fallback to the platform.
 - **Usage tracking**: every LLM call is logged with tokens, model, provider, key source and cost.
 - **Statistics** ready for the dashboard, plus a flat dataset of receipts and items for the price analytics computed in the browser.
@@ -96,7 +97,13 @@ pnpm simulate:upload fixtures/receipts   # terminal 3 — behaves like the web a
 ```
 
 `simulate:upload` also needs `SIMULATE_EMAIL`, `SIMULATE_PASSWORD`, `SUPABASE_URL` and `SUPABASE_ANON_KEY`.
-Want a populated dashboard right away? `pnpm seed:demo` creates a demo user with one year of spending.
+
+> [!TIP]
+> `pnpm db:migrate` sets `lock_timeout = 10s`. If a running API query holds a lock on a table
+> the migration wants to alter, it fails fast instead of queueing for the whole `statement_timeout`
+> (2 min on Supabase) — and blocking every other read of that table meanwhile. Find the blocker with
+> `pg_stat_activity` / `pg_locks`, end it with `pg_terminate_backend(pid)` and run the migration again.
+> Want a populated dashboard right away? `pnpm seed:demo` creates a demo user with one year of spending.
 
 ---
 
@@ -212,6 +219,19 @@ $$
 $$
 
 and a note explains the mismatch, so the user knows which receipts to double-check.
+
+**Avoidability.** The prompt asks the model to judge the _product_, not the shop:
+
+| Level        | Meaning                                    | Examples                                                              |
+| ------------ | ------------------------------------------ | --------------------------------------------------------------------- |
+| `essenziale` | basic need                                 | staple food, medicines, bills, rent, commuting fuel                   |
+| `utile`      | needed, but could have waited or cost less | premium brands with a cheaper option, ready meals, non-urgent clothes |
+| `superfluo`  | could have been skipped                    | sweets, snacks, alcohol, bar and restaurant, leisure, impulse buys    |
+
+When unsure the model picks `utile`; discounts and non-product lines get no level. The value is stored
+on `extractions` and `receipt_items` (`null` for older extractions), can be edited by the user and is
+returned by `GET /v1/stats/dataset`. The avoidability index is computed in the browser
+([web README](https://github.com/pitock/pitock-web#8-avoidable-spending)).
 
 **Merchant harmonization.** The same shop printed as `IN'S SUPERMERCATO`, `IN's supermercato` or
 `Lidl Italia S.r.l.` / `LIDL` becomes one merchant:
