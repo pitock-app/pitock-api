@@ -13,7 +13,13 @@ if (!databaseUrl) {
   process.exit(1);
 }
 
-const client = postgres(databaseUrl, { prepare: false, max: 1 });
+// lock_timeout (ms): se una query dell'API tiene un lock sulle tabelle, la migrazione fallisce
+// subito invece di restare in coda (e bloccare a sua volta le letture) fino allo statement_timeout.
+const client = postgres(databaseUrl, {
+  prepare: false,
+  max: 1,
+  connection: { lock_timeout: 10_000 },
+});
 const db = drizzle(client);
 
 try {
