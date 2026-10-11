@@ -54,6 +54,7 @@ export function postprocess(out: ReceiptExtraction): PostprocessResult {
       taxTotal: round(out.tax_total, 2),
       paymentMethod: out.payment_method,
       category: out.category,
+      avoidability: out.avoidability ?? null,
       notes,
     },
     items: out.items.map((i) => ({
@@ -67,6 +68,7 @@ export function postprocess(out: ReceiptExtraction): PostprocessResult {
       brand: clean(i.brand),
       size: i.size && i.size > 0 ? round(i.size, 3) : null,
       sizeUnit: i.size && i.size > 0 ? (i.size_unit ?? null) : null,
+      avoidability: i.avoidability ?? null,
     })),
   };
 }

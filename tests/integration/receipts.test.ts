@@ -247,6 +247,39 @@ describe("inserimento manuale", () => {
     expect(raw?.raw_json.merchantName).toBe("Bar Sport");
   });
 
+  it("salva l'evitabilità di scontrino e righe e la restituisce anche nel dataset", async () => {
+    const res = await h.call(user, "POST", "/v1/receipts/manual", {
+      ...manualInput,
+      avoidability: "superfluo",
+      items: [
+        { description: "Caffè", amount: 2.4, avoidability: "superfluo" },
+        { description: "Acqua", amount: 2.1, avoidability: "essenziale" },
+      ],
+    });
+    expect(res.status).toBe(201);
+    const d = await json<{
+      receipt: { id: string };
+      extraction: { avoidability: string | null };
+      items: { avoidability: string | null }[];
+    }>(res);
+    expect(d.extraction.avoidability).toBe("superfluo");
+    expect(d.items.map((i) => i.avoidability)).toEqual(["superfluo", "essenziale"]);
+    const dataset = await json<{
+      receipts: { id: string; avoidability: string | null }[];
+      items: { receiptId: string; avoidability: string | null }[];
+    }>(await h.call(user, "GET", "/v1/stats/dataset"));
+    expect(dataset.receipts.find((r) => r.id === d.receipt.id)?.avoidability).toBe("superfluo");
+    expect(
+      dataset.items.filter((i) => i.receiptId === d.receipt.id).map((i) => i.avoidability),
+    ).toEqual(["superfluo", "essenziale"]);
+
+    const bad = await h.call(user, "POST", "/v1/receipts/manual", {
+      ...manualInput,
+      avoidability: "lusso",
+    });
+    expect(bad.status).toBe(400);
+  });
+
   it("data senza fuso → Europe/Rome", async () => {
     const res = await h.call(user, "POST", "/v1/receipts/manual", {
       ...manualInput,

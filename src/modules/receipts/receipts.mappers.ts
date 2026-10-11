@@ -1,7 +1,9 @@
 import {
+  AVOIDABILITY,
   CATEGORIES,
   PAYMENT_METHODS,
   SIZE_UNITS,
+  type Avoidability,
   type Category,
   type PaymentMethod,
   type SizeUnit,
@@ -18,6 +20,9 @@ export const asCategory = (v: string | null): Category | null =>
   (CATEGORIES as readonly string[]).includes(v ?? "") ? (v as Category) : null;
 export const asPaymentMethod = (v: string | null): PaymentMethod | null =>
   (PAYMENT_METHODS as readonly string[]).includes(v ?? "") ? (v as PaymentMethod) : null;
+
+export const asAvoidability = (v: string | null): Avoidability | null =>
+  (AVOIDABILITY as readonly string[]).includes(v ?? "") ? (v as Avoidability) : null;
 
 export const toReceipt = (r: ReceiptRow) => ({
   id: r.id,
@@ -46,6 +51,7 @@ export const toItem = (i: ItemRow) => ({
   brand: i.brand,
   size: i.size,
   sizeUnit: asSizeUnit(i.sizeUnit),
+  avoidability: asAvoidability(i.avoidability),
 });
 
 const asSizeUnit = (v: string | null): SizeUnit | null =>
@@ -63,6 +69,7 @@ export const toItemFields = (i: ItemInput): ItemFields => ({
   brand: i.brand?.trim() || null,
   size: i.size ?? null,
   sizeUnit: i.size ? (i.sizeUnit ?? null) : null,
+  avoidability: i.avoidability ?? null,
 });
 
 export const toExtraction = (e: ExtractionWithItems) => ({
@@ -83,6 +90,7 @@ export const toExtraction = (e: ExtractionWithItems) => ({
   taxTotal: e.taxTotal,
   paymentMethod: asPaymentMethod(e.paymentMethod),
   category: asCategory(e.category),
+  avoidability: asAvoidability(e.avoidability),
   confidence: e.confidence,
   notes: e.notes,
   isCurrent: e.isCurrent,

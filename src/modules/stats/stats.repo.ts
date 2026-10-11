@@ -135,6 +135,7 @@ export function createStatsRepo(db: Db) {
           merchantVat: extractions.merchantVat,
           total: extractions.total,
           category: extractions.category,
+          avoidability: extractions.avoidability,
           source: receiptsRaw.source,
         })
         .from(receiptsRaw)
@@ -154,6 +155,7 @@ export function createStatsRepo(db: Db) {
           brand: receiptItems.brand,
           size: receiptItems.size,
           sizeUnit: receiptItems.sizeUnit,
+          avoidability: receiptItems.avoidability,
         })
         .from(receiptsRaw)
         .innerJoin(extractions, join)

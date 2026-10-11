@@ -5,6 +5,8 @@ import { IsoDateInput } from "../../shared/openapi.js";
 import { PaginationQuery } from "../../shared/pagination.js";
 import {
   CategorySchema,
+  AvoidabilitySchema,
+  NullableAvoidability,
   NullableCategory,
   NullablePaymentMethod,
   PaymentMethodSchema,
@@ -75,6 +77,7 @@ const ItemInput = z.object({
   brand: text(100).nullable().optional(),
   size: z.number().positive().max(9_999_999).nullable().optional(),
   sizeUnit: z.union([SizeUnit, z.null()]).optional(),
+  avoidability: z.union([AvoidabilitySchema, z.null()]).optional(),
 });
 export type ItemInput = z.infer<typeof ItemInput>;
 
@@ -89,6 +92,7 @@ export const ManualReceiptInput = z
     taxTotal: amount().optional(),
     paymentMethod: PaymentMethodSchema,
     category: CategorySchema,
+    avoidability: AvoidabilitySchema.optional(),
     notes: z.string().max(2000).optional(),
     items: z.array(ItemInput).max(500).optional(),
   })
@@ -137,6 +141,7 @@ export const ReceiptItem = z
     brand: z.string().nullable(),
     size: z.number().nullable().openapi({ description: "Formato della confezione, in `sizeUnit`" }),
     sizeUnit: z.union([SizeUnit, z.null()]),
+    avoidability: NullableAvoidability,
   })
   .openapi("ReceiptItem");
 
@@ -161,6 +166,7 @@ export const ExtractionDetail = z
     taxTotal: z.number().nullable(),
     paymentMethod: NullablePaymentMethod,
     category: NullableCategory,
+    avoidability: NullableAvoidability,
     confidence: z.number().nullable(),
     notes: z.string().nullable(),
     isCurrent: z.boolean(),
@@ -237,6 +243,7 @@ export const ExtractionPatch = z
     taxTotal: amount().nullable(),
     paymentMethod: NullablePaymentMethod,
     category: NullableCategory,
+    avoidability: NullableAvoidability,
     notes: z.string().max(2000).nullable(),
     items: z.array(ItemInput).max(500),
   })

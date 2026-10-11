@@ -1,4 +1,4 @@
-export const PROMPT_VERSION = "v7";
+export const PROMPT_VERSION = "v8";
 
 export const EXTRACTION_INSTRUCTIONS =
   "Sei un estrattore di dati da scontrini e ricevute italiane. Ricevi un'immagine, un PDF o più immagini consecutive dello stesso scontrino. " +
@@ -27,6 +27,14 @@ export const EXTRACTION_INSTRUCTIONS =
   "svago = libri, giochi, sport, spettacoli, hobby; servizi = ricariche, abbonamenti, riparazioni, " +
   "lavanderia, cura della persona dal parrucchiere; igiene = igiene personale e cosmetici (sapone, shampoo, dentifricio, assorbenti, rasoi, trucco); altro = tutto ciò che non rientra. " +
   "Per sconti, buoni, sacchetti e righe non di prodotto `category` è null. " +
+  "`avoidability` dice quanto si poteva evitare la spesa, per ogni riga di prodotto e per lo scontrino intero: " +
+  "essenziale = necessità di base (cibo di base, farmaci, bollette, affitto, trasporti e carburante per lavoro o studio, igiene di base); " +
+  "utile = serve ma si poteva rimandare o spendere meno (prodotti premium o di marca con un'alternativa economica, " +
+  "piatti pronti, abbigliamento e tecnologia non urgenti, ricambi, piccoli servizi di comodità); " +
+  "superfluo = si poteva non comprare (dolci, snack, alcolici, bibite zuccherate, pasti e bevande al bar o al ristorante, " +
+  "svago, gadget, cosmetici non di base, acquisti d'impulso). " +
+  "Scegli in base al prodotto, non al negozio; nel dubbio usa utile. Per sconti, buoni e righe non di prodotto ometti `avoidability`; " +
+  "quello dello scontrino descrive la spesa nel suo complesso. " +
   "Gli importi delle righe sono quelli effettivamente pagati: uno sconto, un'offerta o un buono " +
   'stampato sotto un prodotto (es. "SCONTO 20%", "PROMO -0,50") va sottratto dalla riga di quel ' +
   "prodotto, con `amount` al netto dello sconto e `unit_price` = `amount` / `quantity`, e non va " +

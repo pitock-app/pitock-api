@@ -14,6 +14,11 @@ export const CATEGORIES = [
   "igiene",
   "altro",
 ] as const;
+/**
+ * Quanto si poteva evitare una spesa: essenziale (necessità), utile (si poteva rimandare o
+ * spendere meno), superfluo (si poteva non comprare).
+ */
+export const AVOIDABILITY = ["essenziale", "utile", "superfluo"] as const;
 export const PAYMENT_METHODS = ["contanti", "carta", "bancomat", "altro", "sconosciuto"] as const;
 
 /** Unità del formato di una confezione. */
@@ -22,14 +27,20 @@ export const SIZE_UNITS = ["g", "kg", "ml", "cl", "l", "pz"] as const;
 export type Category = (typeof CATEGORIES)[number];
 export type SizeUnit = (typeof SIZE_UNITS)[number];
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+export type Avoidability = (typeof AVOIDABILITY)[number];
 
 export const CategorySchema = z.enum(CATEGORIES).openapi("Category");
 export const PaymentMethodSchema = z.enum(PAYMENT_METHODS).openapi("PaymentMethod");
+export const AvoidabilitySchema = z.enum(AVOIDABILITY).openapi("Avoidability", {
+  description:
+    "Evitabilità della spesa: essenziale (necessità), utile (rimandabile o più economica), superfluo (evitabile)",
+});
 
 // `.nullable()` su uno schema registrato altererebbe il componente condiviso nell'OpenAPI
 // (aggiungendo null all'enum anche dove è obbligatorio): si usa un'unione esplicita.
 export const NullableCategory = z.union([CategorySchema, z.null()]);
 export const NullablePaymentMethod = z.union([PaymentMethodSchema, z.null()]);
+export const NullableAvoidability = z.union([AvoidabilitySchema, z.null()]);
 
 /** Output strutturato richiesto al modello (sezione 7). */
 export const ReceiptExtraction = z.object({
@@ -46,6 +57,9 @@ export const ReceiptExtraction = z.object({
   tax_total: z.number().nullable(),
   payment_method: z.enum(PAYMENT_METHODS),
   category: z.enum(CATEGORIES),
+  // Prompt v8. Facoltativi e non nullable: lo schema è già al limite di 16 campi con unioni
+  // accettato da Anthropic.
+  avoidability: z.enum(AVOIDABILITY).optional(),
   items: z.array(
     z.object({
       description: z.string(),
@@ -58,6 +72,7 @@ export const ReceiptExtraction = z.object({
       brand: z.string().nullable().optional(),
       size: z.number().nullable().optional(),
       size_unit: z.enum(SIZE_UNITS).nullable().optional(),
+      avoidability: z.enum(AVOIDABILITY).optional(),
     }),
   ),
   confidence: z.number().min(0).max(1),

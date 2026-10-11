@@ -164,6 +164,7 @@ export const validOutput = (o: Record<string, unknown> = {}) => ({
   tax_total: 1.1,
   payment_method: "carta",
   category: "alimentari",
+  avoidability: "utile",
   items: [
     {
       description: "Pane",
@@ -172,6 +173,7 @@ export const validOutput = (o: Record<string, unknown> = {}) => ({
       amount: 2.3,
       vat_rate: 4,
       category: "alimentari",
+      avoidability: "essenziale",
     },
     {
       description: "Vino",
@@ -180,6 +182,7 @@ export const validOutput = (o: Record<string, unknown> = {}) => ({
       amount: 10,
       vat_rate: 22,
       category: "alimentari",
+      avoidability: "superfluo",
     },
   ],
   confidence: 0.92,

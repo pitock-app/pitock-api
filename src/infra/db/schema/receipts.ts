@@ -87,6 +87,8 @@ export const extractions = pgTable(
     taxTotal: money("tax_total"),
     paymentMethod: text("payment_method"),
     category: text("category"),
+    /** Evitabilità della spesa nel complesso (essenziale, utile, superfluo). */
+    avoidability: text("avoidability"),
     confidence: real("confidence"),
     notes: text("notes"),
     isCurrent: boolean("is_current").notNull().default(true),
@@ -127,6 +129,8 @@ export const receiptItems = pgTable(
     /** Formato della confezione: quantità e unità (g, kg, ml, cl, l, pz). */
     size: numeric("size", { precision: 10, scale: 3, mode: "number" }),
     sizeUnit: text("size_unit"),
+    /** Evitabilità della riga (essenziale, utile, superfluo). */
+    avoidability: text("avoidability"),
   },
   (t) => [
     foreignKey({

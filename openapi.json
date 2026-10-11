@@ -376,6 +376,16 @@
               }
             ]
           },
+          "avoidability": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Avoidability"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "confidence": {
             "type": ["number", "null"]
           },
@@ -417,6 +427,7 @@
           "taxTotal",
           "paymentMethod",
           "category",
+          "avoidability",
           "confidence",
           "notes",
           "isCurrent",
@@ -445,6 +456,11 @@
           "igiene",
           "altro"
         ]
+      },
+      "Avoidability": {
+        "type": "string",
+        "enum": ["essenziale", "utile", "superfluo"],
+        "description": "Evitabilità della spesa: essenziale (necessità), utile (rimandabile o più economica), superfluo (evitabile)"
       },
       "ReceiptItem": {
         "type": "object",
@@ -501,6 +517,16 @@
                 "type": "null"
               }
             ]
+          },
+          "avoidability": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Avoidability"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -515,7 +541,8 @@
           "normalizedName",
           "brand",
           "size",
-          "sizeUnit"
+          "sizeUnit",
+          "avoidability"
         ]
       },
       "SizeUnit": {
@@ -565,6 +592,9 @@
           },
           "category": {
             "$ref": "#/components/schemas/Category"
+          },
+          "avoidability": {
+            "$ref": "#/components/schemas/Avoidability"
           },
           "notes": {
             "type": "string",
@@ -623,6 +653,16 @@
                   "anyOf": [
                     {
                       "$ref": "#/components/schemas/SizeUnit"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "avoidability": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Avoidability"
                     },
                     {
                       "type": "null"
@@ -784,6 +824,16 @@
               }
             ]
           },
+          "avoidability": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Avoidability"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "notes": {
             "type": ["string", "null"],
             "maxLength": 2000
@@ -841,6 +891,16 @@
                   "anyOf": [
                     {
                       "$ref": "#/components/schemas/SizeUnit"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "avoidability": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/Avoidability"
                     },
                     {
                       "type": "null"
@@ -1457,6 +1517,17 @@
           "category": {
             "$ref": "#/components/schemas/Category"
           },
+          "avoidability": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Avoidability"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Evitabilità dello scontrino nel complesso; null se non classificato"
+          },
           "source": {
             "$ref": "#/components/schemas/ReceiptSource"
           }
@@ -1468,6 +1539,7 @@
           "merchantOriginal",
           "total",
           "category",
+          "avoidability",
           "source"
         ]
       },
@@ -1519,6 +1591,17 @@
                 "type": "null"
               }
             ]
+          },
+          "avoidability": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Avoidability"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Evitabilità della riga; null se non classificata (estrazioni prima del prompt v8)"
           }
         },
         "required": [
@@ -1531,7 +1614,8 @@
           "normalizedName",
           "brand",
           "size",
-          "sizeUnit"
+          "sizeUnit",
+          "avoidability"
         ]
       }
     },

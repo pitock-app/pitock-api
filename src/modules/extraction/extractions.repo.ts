@@ -20,6 +20,7 @@ export type ExtractionFields = Partial<
     | "taxTotal"
     | "paymentMethod"
     | "category"
+    | "avoidability"
     | "notes"
   >
 >;
@@ -36,6 +37,7 @@ export type ItemFields = Pick<
   | "brand"
   | "size"
   | "sizeUnit"
+  | "avoidability"
 >;
 
 export interface ManualReceiptValues {

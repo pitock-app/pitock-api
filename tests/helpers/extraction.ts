@@ -56,8 +56,9 @@ export interface Detail {
     keySource: string;
     promptVersion: string;
     purchasedAt: string;
+    avoidability: string | null;
   };
-  items: { description: string; amount: number }[];
+  items: { description: string; amount: number; avoidability: string | null }[];
   usage?: { provider: string; model: string; totalTokens: number; costUsd: number | null };
 }
 

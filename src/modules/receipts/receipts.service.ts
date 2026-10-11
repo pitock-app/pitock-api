@@ -173,6 +173,7 @@ export function createReceiptsService(d: ReceiptsDeps) {
           taxTotal: input.taxTotal ?? null,
           paymentMethod: input.paymentMethod,
           category: input.category,
+          avoidability: input.avoidability ?? null,
           notes: input.notes ?? null,
         },
         items: (input.items ?? []).map(toItemFields),

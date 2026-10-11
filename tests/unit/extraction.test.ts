@@ -22,6 +22,30 @@ describe("postprocess", () => {
     expect(r.items).toHaveLength(2);
   });
 
+  it("riporta l'evitabilità di scontrino e righe; se manca è null", () => {
+    const r = postprocess(parse());
+    expect(r.fields.avoidability).toBe("utile");
+    expect(r.items.map((i) => i.avoidability)).toEqual(["essenziale", "superfluo"]);
+    const old = postprocess(
+      parse({
+        avoidability: undefined,
+        items: [
+          {
+            description: "x",
+            quantity: 1,
+            unit_price: 1,
+            amount: 1,
+            vat_rate: null,
+            category: null,
+          },
+        ],
+        total: 1,
+      }),
+    );
+    expect(old.fields.avoidability).toBeNull();
+    expect(old.items[0]?.avoidability).toBeNull();
+  });
+
   it("tollera uno scarto fino a 0,05", () => {
     expect(postprocess(parse({ total: 12.35 })).confidence).toBe(0.92);
   });

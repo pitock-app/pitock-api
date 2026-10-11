@@ -1,6 +1,8 @@
 import {
+  AVOIDABILITY,
   CATEGORIES,
   SIZE_UNITS,
+  type Avoidability,
   type Category,
   type SizeUnit,
 } from "../extraction/extraction.schema.js";
@@ -24,6 +26,9 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 
 const asSizeUnit = (u: string | null): SizeUnit | null =>
   (SIZE_UNITS as readonly string[]).includes(u ?? "") ? (u as SizeUnit) : null;
+
+const asAvoidability = (a: string | null): Avoidability | null =>
+  (AVOIDABILITY as readonly string[]).includes(a ?? "") ? (a as Avoidability) : null;
 
 const asCategory = (c: string): Category =>
   (CATEGORIES as readonly string[]).includes(c) ? (c as Category) : "altro";
@@ -137,12 +142,14 @@ export function createStatsService(d: StatsDeps) {
           merchantOriginal: r.merchantName,
           total: r.total,
           category: asCategory(r.category ?? "altro"),
+          avoidability: asAvoidability(r.avoidability),
           source: r.source,
         })),
         items: s.items.map((i) => ({
           ...i,
           category: asCategory(i.category ?? "altro"),
           sizeUnit: asSizeUnit(i.sizeUnit),
+          avoidability: asAvoidability(i.avoidability),
         })),
       };
     },

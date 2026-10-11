@@ -1,6 +1,10 @@
 import { z } from "@hono/zod-openapi";
 import { IsoDateInput } from "../../shared/openapi.js";
-import { CategorySchema, SIZE_UNITS } from "../extraction/extraction.schema.js";
+import {
+  CategorySchema,
+  NullableAvoidability,
+  SIZE_UNITS,
+} from "../extraction/extraction.schema.js";
 import { ReceiptSource } from "../receipts/receipts.schemas.js";
 
 export const StatsQuery = z.object({
@@ -83,6 +87,9 @@ export const StatsDatasetResponse = z
           }),
           total: z.number().nullable(),
           category: CategorySchema,
+          avoidability: NullableAvoidability.openapi({
+            description: "Evitabilità dello scontrino nel complesso; null se non classificato",
+          }),
           source: ReceiptSource,
         })
         .openapi("StatsReceiptFact"),
@@ -102,6 +109,10 @@ export const StatsDatasetResponse = z
           brand: z.string().nullable(),
           size: z.number().nullable(),
           sizeUnit: z.union([z.enum(SIZE_UNITS), z.null()]),
+          avoidability: NullableAvoidability.openapi({
+            description:
+              "Evitabilità della riga; null se non classificata (estrazioni prima del prompt v8)",
+          }),
         })
         .openapi("StatsItemFact"),
     ),
