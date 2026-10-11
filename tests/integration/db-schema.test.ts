@@ -41,7 +41,9 @@ describe("migrazioni su DB vuoto", () => {
     expect(rows.map((r) => r.table_name)).toEqual([
       "extractions",
       "llm_usage",
+      "merchant_names",
       "model_prices",
+      "rate_limits",
       "receipt_items",
       "receipts_raw",
       "stats_monthly",

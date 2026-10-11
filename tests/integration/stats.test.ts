@@ -182,6 +182,7 @@ interface Dataset {
   from: string | null;
   to: string | null;
   truncated: boolean;
+  nextCursor: string | null;
   receipts: {
     id: string;
     date: string;
@@ -235,6 +236,36 @@ describe("GET /v1/stats/dataset", () => {
     ]);
     const res = await h.call(a, "GET", "/v1/stats/dataset?from=2026-10-02&to=2026-10-01");
     expect(res.status).toBe(400);
+  });
+
+  it("a pagine: nessuno scontrino perso o doppio, ogni pagina con le sue righe", async () => {
+    const all = await getDataset(a);
+    const seen: string[] = [];
+    let items = 0;
+    let cursor: string | null = null;
+    let pages = 0;
+    do {
+      const query: string = `?limit=1${cursor ? `&cursor=${cursor}` : ""}`;
+      const page = await getDataset(a, query);
+      expect(page.receipts).toHaveLength(1);
+      expect(page.truncated).toBe(page.nextCursor !== null);
+      const ids = new Set(page.receipts.map((r) => r.id));
+      expect(page.items.every((i) => ids.has(i.receiptId))).toBe(true);
+      seen.push(...page.receipts.map((r) => r.id));
+      items += page.items.length;
+      cursor = page.nextCursor;
+      pages += 1;
+    } while (cursor && pages < 10);
+    expect(seen).toEqual(all.receipts.map((r) => r.id));
+    expect(items).toBe(all.items.length);
+  });
+
+  it("rifiuta un cursore non valido", async () => {
+    for (const cursor of ["abc", Buffer.from('{"at":"x","id":"y"}').toString("base64url")]) {
+      const res = await h.call(a, "GET", `/v1/stats/dataset?cursor=${cursor}`);
+      expect(res.status).toBe(400);
+    }
+    expect((await h.call(a, "GET", "/v1/stats/dataset?limit=5000")).status).toBe(400);
   });
 
   it("ogni utente vede solo i propri dati e serve l'autenticazione", async () => {
@@ -309,7 +340,12 @@ describe("GET /cron/recompute-stats", () => {
     await h.t.query(`delete from stats_monthly`);
     const res = await cron(`Bearer ${h.env.CRON_SECRET ?? ""}`);
     expect(res.status).toBe(200);
-    expect(await json(res)).toEqual({ ok: true, users: 2, failed: 0 });
+    expect(await json(res)).toMatchObject({
+      ok: true,
+      users: 2,
+      failed: 0,
+      cleanup: { failedProcessing: 0, deletedUploads: 0 },
+    });
     expect(await monthly(a)).toHaveLength(3);
     expect(await monthly(b)).toEqual([
       { month: "2026-09-01", category: "alimentari", total: "50.00", n_receipts: 1 },
@@ -403,5 +439,60 @@ describe("negozi armonizzati", () => {
     expect(new Set(all.receipts.map((r) => r.merchantName))).toEqual(
       new Set(["IN's supermercato"]),
     );
+  });
+
+  it("dopo il ricalcolo legge i nomi da merchant_names, senza riarmonizzare lo storico", async () => {
+    const c = await h.t.createUser();
+    const at = new Date("2026-09-10T10:00:00Z");
+    await seedExtractedFile(h.t.db, c, {
+      merchantName: "IN'S SUPERMERCATO",
+      total: 10,
+      purchasedAt: at,
+    });
+    await seedExtractedFile(h.t.db, c, {
+      merchantName: "IN's supermercato",
+      total: 5,
+      purchasedAt: at,
+    });
+    await h.container.stats.recompute(c);
+    const stored = await h.t.query<{ variant_key: string; name: string }>(
+      `select variant_key, name from merchant_names where user_id = '${c}' order by variant_key`,
+    );
+    expect(stored.map((r) => r.name)).toEqual(["IN's supermercato", "IN's supermercato"]);
+
+    // Il nome salvato è quello usato: lo cambio a mano e le risposte lo seguono.
+    await h.t.exec(`update merchant_names set name = 'Ins' where user_id = '${c}'`);
+    expect((await getStats(c)).topMerchants.map((m) => m.merchantName)).toEqual(["Ins"]);
+
+    // Una variante nuova, non ancora ricalcolata: si torna al calcolo sull'intero storico.
+    await seedExtractedFile(h.t.db, c, {
+      merchantName: "ins supermercato",
+      total: 1,
+      purchasedAt: at,
+    });
+    const names = new Set((await getDataset(c)).receipts.map((r) => r.merchantName));
+    // Tre scritture, un solo nome armonizzato, e non quello scritto a mano in tabella.
+    expect(names.size).toBe(1);
+    expect(names.has("Ins")).toBe(false);
+  });
+});
+
+// Dopo il cron, che conta gli utenti: questo test ne crea uno nuovo.
+describe("dataset a pagine con date uguali", () => {
+  it("le pagine non perdono scontrini con la stessa data al microsecondo", async () => {
+    const c = await h.t.createUser();
+    for (let i = 0; i < 5; i++)
+      await seedExtractedFile(h.t.db, c, { total: i + 1, purchasedAt: null });
+    await h.t.exec(
+      `update receipts_raw set created_at = '2026-09-10 10:00:00.123456+00' where user_id = '${c}'`,
+    );
+    const seen = new Set<string>();
+    let cursor: string | null = null;
+    do {
+      const page: Dataset = await getDataset(c, `?limit=2${cursor ? `&cursor=${cursor}` : ""}`);
+      page.receipts.forEach((r) => seen.add(r.id));
+      cursor = page.nextCursor;
+    } while (cursor);
+    expect(seen.size).toBe(5);
   });
 });

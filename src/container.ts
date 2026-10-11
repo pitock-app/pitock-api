@@ -1,5 +1,6 @@
 import type { Env } from "./config/env.js";
 import { createDb, type Db } from "./infra/db/client.js";
+import { createPgRateLimitStore } from "./infra/db/rate-limit-store.js";
 import { unavailableDb } from "./infra/db/unavailable.js";
 import type { Inngest } from "inngest";
 import { createKeyCipher, type KeyCipher } from "./infra/crypto/key-cipher.js";
@@ -19,10 +20,13 @@ import { createModelsService } from "./modules/ai/models.service.js";
 import { createExtractionService } from "./modules/extraction/extraction.service.js";
 import { createAccountRepo } from "./modules/account/account.repo.js";
 import { createAccountService } from "./modules/account/account.service.js";
+import { createMaintenanceRepo } from "./modules/maintenance/maintenance.repo.js";
+import { createMaintenanceService } from "./modules/maintenance/maintenance.service.js";
 import { createStatsRepo } from "./modules/stats/stats.repo.js";
 import { createStatsService } from "./modules/stats/stats.service.js";
 import { createSupabaseUserAdmin } from "./infra/auth/supabase-user-admin.adapter.js";
 import type { UserAdminPort } from "./ports/user-admin.port.js";
+import type { RateLimitStore } from "./middleware/rate-limit.js";
 import { createExtractionEditService } from "./modules/extraction/extraction-edit.service.js";
 import { createExtractionsRepo } from "./modules/extraction/extractions.repo.js";
 import { createReceiptsRepo } from "./modules/receipts/receipts.repo.js";
@@ -47,6 +51,8 @@ export interface Infra {
   llm: LlmPort;
   catalog: ModelCatalogPort;
   users: UserAdminPort;
+  /** Di default su Postgres (`rate_limits`); i test possono passarne uno in memoria. */
+  rateLimits?: RateLimitStore;
 }
 
 /** Cifrario delle chiavi BYOK; `null` se `KEY_ENCRYPTION_SECRET` manca. */
@@ -70,6 +76,7 @@ export function buildContainer(env: Env, infra: Infra) {
 
   return {
     auth: infra.auth,
+    rateLimits: infra.rateLimits ?? createPgRateLimitStore(infra.db),
     receipts: createReceiptsService({
       receipts,
       extractions,
@@ -100,6 +107,11 @@ export function buildContainer(env: Env, infra: Infra) {
       env,
     }),
     stats: createStatsService({ stats: createStatsRepo(infra.db) }),
+    maintenance: createMaintenanceService({
+      maintenance: createMaintenanceRepo(infra.db),
+      storage: infra.storage,
+      clock: infra.clock,
+    }),
     settings: createSettingsService({
       settings,
       usage,

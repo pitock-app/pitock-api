@@ -268,7 +268,7 @@
           },
           "errorCode": {
             "type": ["string", "null"],
-            "description": "Motivo del fallimento quando status=failed. Valori attuali: NOT_A_RECEIPT, INVALID_OUTPUT, UNSUPPORTED_FILE_TYPE, USER_KEY_MISSING, USER_KEY_INVALID, USER_KEY_QUOTA, PLATFORM_QUOTA_EXCEEDED, AI_NOT_CONFIGURED, LLM_UNAVAILABLE, FILE_UNAVAILABLE, INTERNAL.",
+            "description": "Motivo del fallimento quando status=failed. Valori attuali: NOT_A_RECEIPT, INVALID_OUTPUT, UNSUPPORTED_FILE_TYPE, USER_KEY_MISSING, USER_KEY_INVALID, USER_KEY_QUOTA, PLATFORM_QUOTA_EXCEEDED, AI_NOT_CONFIGURED, LLM_UNAVAILABLE, TIMEOUT, FILE_UNAVAILABLE, INTERNAL.",
             "example": "NOT_A_RECEIPT"
           },
           "createdAt": {
@@ -1473,7 +1473,11 @@
           },
           "truncated": {
             "type": "boolean",
-            "description": "Vero se uno dei due elenchi supera il limite ed è stato tagliato ai più recenti"
+            "description": "Vero se ci sono altri scontrini oltre questa pagina (equivale a `nextCursor` non null)"
+          },
+          "nextCursor": {
+            "type": ["string", "null"],
+            "description": "Da passare come `cursor` per la pagina successiva; null all'ultima pagina. Le pagine vanno dal più recente al più vecchio"
           },
           "receipts": {
             "type": "array",
@@ -1488,8 +1492,8 @@
             }
           }
         },
-        "required": ["from", "to", "truncated", "receipts", "items"],
-        "description": "Scontrini e righe prodotto del periodo (estrazioni correnti degli scontrini estratti), dal più recente"
+        "required": ["from", "to", "truncated", "nextCursor", "receipts", "items"],
+        "description": "Una pagina di scontrini del periodo (estrazioni correnti degli scontrini estratti), dal più recente, con tutte le loro righe prodotto"
       },
       "StatsReceiptFact": {
         "type": "object",
@@ -3661,6 +3665,30 @@
             "required": false,
             "description": "Incluso; con la sola data comprende l'intera giornata. Default: nessun limite",
             "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 300,
+              "description": "`nextCursor` della pagina precedente; assente per la prima pagina"
+            },
+            "required": false,
+            "description": "`nextCursor` della pagina precedente; assente per la prima pagina",
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 500,
+              "description": "Scontrini per pagina, con tutte le loro righe prodotto"
+            },
+            "required": false,
+            "description": "Scontrini per pagina, con tutte le loro righe prodotto",
+            "name": "limit",
             "in": "query"
           }
         ],

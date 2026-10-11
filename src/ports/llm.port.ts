@@ -24,6 +24,8 @@ export interface LlmRequest {
   /** Uno o più file dello stesso documento, in ordine (le fasce di uno scontrino lungo). */
   files: LlmFile[];
   schema: z.ZodType;
+  /** Interrompe la chiamata: scade con il budget di tempo dell'estrazione. */
+  abortSignal?: AbortSignal;
 }
 
 export interface LlmResult {
@@ -37,9 +39,11 @@ export interface LlmResult {
  * - `quota`: credito o quota del provider esauriti
  * - `unsupported_file`: il provider o il modello non accetta il file (es. PDF)
  * - `invalid_output`: risposta non conforme allo schema
+ * - `timeout`: la chiamata è stata interrotta perché il tempo a disposizione è finito
  * - `unavailable`: qualunque altro errore del provider o di rete
  */
-export type LlmErrorKind = "auth" | "quota" | "unsupported_file" | "invalid_output" | "unavailable";
+export type LlmErrorKind =
+  "auth" | "quota" | "unsupported_file" | "invalid_output" | "timeout" | "unavailable";
 
 /** Errore del provider già classificato. Il messaggio non contiene mai la chiave né la risposta. */
 export class LlmError extends Error {

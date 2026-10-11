@@ -1,3 +1,4 @@
+import { z } from "zod";
 import {
   AVOIDABILITY,
   CATEGORIES,
@@ -9,7 +10,7 @@ import {
 import { harmonizeMerchants, type MerchantSource } from "./merchants.js";
 import { parseIsoInTimeZone, parseRangeEnd } from "../../shared/dates.js";
 import { AppError } from "../../shared/errors.js";
-import type { StatsRepo } from "./stats.repo.js";
+import type { DatasetPosition, StatsRepo } from "./stats.repo.js";
 import type { StatsDatasetQuery, StatsQuery } from "./stats.schemas.js";
 
 export interface StatsDeps {
@@ -19,8 +20,23 @@ export interface StatsDeps {
 /** Esercenti restituiti da `topMerchants`. */
 export const TOP_MERCHANTS = 10;
 
-/** Massimo di scontrini e di righe restituiti da `/v1/stats/dataset`. */
-export const DATASET_LIMIT = 5000;
+/** `timestamptz::text` di Postgres, es. `2026-09-10 10:00:00.123456+00`. */
+const PG_TIMESTAMPTZ =
+  /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d{1,6})?([+-]\d{2}(:?\d{2})?|Z)$/;
+const DatasetCursor = z.object({ at: z.string().regex(PG_TIMESTAMPTZ), id: z.uuid() });
+
+/** Cursore opaco del dataset: base64url di `{ at, id }` (vedi `DatasetPosition`). */
+export function encodeDatasetCursor(p: DatasetPosition): string {
+  return Buffer.from(JSON.stringify(p)).toString("base64url");
+}
+
+export function decodeDatasetCursor(raw: string): DatasetPosition {
+  try {
+    return DatasetCursor.parse(JSON.parse(Buffer.from(raw, "base64url").toString("utf8")));
+  } catch {
+    throw new AppError("VALIDATION_ERROR", "Cursore non valido");
+  }
+}
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -37,14 +53,31 @@ type MerchantNames = (source: MerchantSource) => string | null;
 
 const variantKey = (s: MerchantSource) => JSON.stringify([s.name, s.brand, s.vat]);
 
-/**
- * Nomi armonizzati calcolati su tutte le varianti dell'utente: lo stesso negozio ha lo stesso
- * nome in ogni periodo, così filtri e totali di richieste diverse coincidono.
- */
-async function merchantNames(repo: StatsRepo, userId: string): Promise<MerchantNames> {
+/** Nomi armonizzati di tutte le varianti dell'utente, calcolati sull'intero storico. */
+async function harmonizedNames(repo: StatsRepo, userId: string) {
   const variants = await repo.merchantVariants(userId);
   const names = harmonizeMerchants(variants);
-  const byVariant = new Map(variants.map((v, i) => [variantKey(v), names[i] ?? null]));
+  return variants.map((v, i) => ({ variantKey: variantKey(v), name: names[i] ?? null }));
+}
+
+/**
+ * Nomi armonizzati: lo stesso negozio ha lo stesso nome in ogni periodo, così filtri e totali
+ * di richieste diverse coincidono. Si leggono da `merchant_names`, scritta da `recompute`;
+ * se una variante richiesta non c'è ancora (scontrino estratto dopo l'ultimo ricalcolo) si
+ * ricalcolano sull'intero storico, come prima che la tabella esistesse.
+ */
+async function merchantNames(
+  repo: StatsRepo,
+  userId: string,
+  stored: Promise<{ variantKey: string; name: string | null }[]>,
+  sources: MerchantSource[],
+): Promise<MerchantNames> {
+  let rows = await stored;
+  let byVariant = new Map(rows.map((r) => [r.variantKey, r.name]));
+  if (sources.some((source) => !byVariant.has(variantKey(source)))) {
+    rows = await harmonizedNames(repo, userId);
+    byVariant = new Map(rows.map((r) => [r.variantKey, r.name]));
+  }
   return (source) => byVariant.get(variantKey(source)) ?? harmonizeMerchants([source])[0] ?? null;
 }
 
@@ -81,14 +114,20 @@ function parseRange(q: { from?: string; to?: string }) {
 
 /** Statistiche di spesa (`/v1/stats`, `/v1/stats/dataset`) e ricalcolo di `stats_monthly`. */
 export function createStatsService(d: StatsDeps) {
+  /** Riscrive `stats_monthly` e i nomi armonizzati dei negozi dell'utente. */
+  async function recompute(userId: string) {
+    const rows = await d.stats.recompute(userId);
+    await d.stats.saveMerchantNames(userId, await harmonizedNames(d.stats, userId));
+    return rows;
+  }
+
   return {
     async summary(userId: string, q: StatsQuery) {
       const range = parseRange(q);
       const { from, to } = range;
-      const [s, nameOf] = await Promise.all([
-        d.stats.summary(userId, range, q.granularity),
-        merchantNames(d.stats, userId),
-      ]);
+      const stored = d.stats.storedMerchantNames(userId);
+      const s = await d.stats.summary(userId, range, q.granularity);
+      const nameOf = await merchantNames(d.stats, userId, stored, s.merchants);
 
       // Categorie fuori elenco (dati storici) confluiscono in "altro".
       const byCategory = new Map<Category, { total: number; nReceipts: number }>();
@@ -123,14 +162,24 @@ export function createStatsService(d: StatsDeps) {
     /** Scontrini e righe prodotto del periodo, per le analisi di convenienza della dashboard. */
     async dataset(userId: string, q: StatsDatasetQuery) {
       const range = parseRange(q);
-      const [s, nameOf] = await Promise.all([
-        d.stats.dataset(userId, range, DATASET_LIMIT),
-        merchantNames(d.stats, userId),
-      ]);
+      const stored = d.stats.storedMerchantNames(userId);
+      const after = q.cursor ? decodeDatasetCursor(q.cursor) : null;
+      const s = await d.stats.dataset(userId, range, q.limit, after);
+      const nameOf = await merchantNames(
+        d.stats,
+        userId,
+        stored,
+        s.receipts.map((r) => ({
+          name: r.merchantName,
+          brand: r.merchantBrand,
+          vat: r.merchantVat,
+        })),
+      );
       return {
         from: range.from?.toISOString() ?? null,
         to: range.to?.toISOString() ?? null,
-        truncated: s.receipts.length >= DATASET_LIMIT || s.items.length >= DATASET_LIMIT,
+        truncated: s.next !== null,
+        nextCursor: s.next ? encodeDatasetCursor(s.next) : null,
         receipts: s.receipts.map((r) => ({
           id: r.id,
           date: r.date.toISOString(),
@@ -154,8 +203,7 @@ export function createStatsService(d: StatsDeps) {
       };
     },
 
-    /** Riscrive `stats_monthly` dell'utente. */
-    recompute: (userId: string) => d.stats.recompute(userId),
+    recompute,
 
     /** Ricalcolo di tutti gli utenti (cron). Un errore su un utente non ferma gli altri. */
     async recomputeAll() {
@@ -163,7 +211,7 @@ export function createStatsService(d: StatsDeps) {
       let failed = 0;
       for (const userId of users) {
         try {
-          await d.stats.recompute(userId);
+          await recompute(userId);
         } catch {
           failed += 1;
         }

@@ -1,7 +1,21 @@
-import { and, asc, desc, eq, gte, isNotNull, lt, sql, type SQL } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  gte,
+  inArray,
+  isNotNull,
+  lt,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import type { Db } from "../../infra/db/client.js";
 import {
   extractions,
+  merchantNames,
   receiptItems,
   receiptsRaw,
   statsMonthly,
@@ -31,6 +45,12 @@ const periodOf = (g: Granularity) =>
   sql<string>`to_char(${localWhen}, ${sql.raw(g === "year" ? "'YYYY'" : "'YYYY-MM'")})`;
 
 const monthStart = sql<string>`to_char(${localWhen}, 'YYYY-MM-01')`;
+
+/** Posizione di uno scontrino nell'ordinamento del dataset (data desc, id asc). */
+export interface DatasetPosition {
+  at: string;
+  id: string;
+}
 
 /**
  * Statistiche calcolate sulle estrazioni correnti degli scontrini `extracted`.
@@ -119,17 +139,28 @@ export function createStatsRepo(db: Db) {
     },
 
     /**
-     * Scontrini e righe del periodo, una riga per scontrino e una per prodotto, dal più
-     * recente. `limit` vale per ciascuno dei due elenchi: chi riceve `limit` righe sa che
-     * l'elenco è troncato.
+     * Una pagina del dataset: fino a `limit` scontrini del periodo, dal più recente, con tutte
+     * le loro righe prodotto. `after` è la posizione dell'ultimo scontrino della pagina
+     * precedente; `at` è la data in testo con la precisione di Postgres (microsecondi), così il
+     * confronto non perde scontrini con lo stesso millisecondo.
      */
-    async dataset(userId: string, range: StatsRange, limit: number) {
+    async dataset(userId: string, range: StatsRange, limit: number, after: DatasetPosition | null) {
       const { join, where } = base(userId, range);
-      const receipts = await db
+      const pageWhere = after
+        ? and(
+            where,
+            or(
+              lt(when, sql`${after.at}::timestamptz`),
+              and(eq(when, sql`${after.at}::timestamptz`), gt(receiptsRaw.id, after.id)),
+            ),
+          )
+        : where;
+      const rows = await db
         .select({
           id: receiptsRaw.id,
           // Copia di `when`: `mapWith` modifica l'espressione su cui è chiamato.
           date: sql<Date>`${when}`.mapWith((v: string | Date) => new Date(v)),
+          at: sql<string>`(${when})::text`,
           merchantName: extractions.merchantName,
           merchantBrand: extractions.merchantBrand,
           merchantVat: extractions.merchantVat,
@@ -140,33 +171,63 @@ export function createStatsRepo(db: Db) {
         })
         .from(receiptsRaw)
         .innerJoin(extractions, join)
-        .where(where)
+        .where(pageWhere)
         .orderBy(desc(when), asc(receiptsRaw.id))
-        .limit(limit);
-      const items = await db
-        .select({
-          receiptId: receiptsRaw.id,
-          description: receiptItems.description,
-          quantity: receiptItems.quantity,
-          unitPrice: receiptItems.unitPrice,
-          amount: receiptItems.amount,
-          category: sql<string | null>`coalesce(${receiptItems.category}, ${extractions.category})`,
-          normalizedName: receiptItems.normalizedName,
-          brand: receiptItems.brand,
-          size: receiptItems.size,
-          sizeUnit: receiptItems.sizeUnit,
-          avoidability: receiptItems.avoidability,
-        })
-        .from(receiptsRaw)
-        .innerJoin(extractions, join)
-        .innerJoin(
-          receiptItems,
-          and(eq(receiptItems.extractionId, extractions.id), eq(receiptItems.userId, userId)),
-        )
-        .where(where)
-        .orderBy(desc(when), asc(receiptsRaw.id), asc(receiptItems.position))
-        .limit(limit);
-      return { receipts, items };
+        .limit(limit + 1);
+      const receipts = rows.slice(0, limit);
+      const last = receipts.at(-1);
+      const next: DatasetPosition | null =
+        rows.length > limit && last ? { at: last.at, id: last.id } : null;
+      const ids = receipts.map((r) => r.id);
+      const items =
+        ids.length === 0
+          ? []
+          : await db
+              .select({
+                receiptId: receiptsRaw.id,
+                description: receiptItems.description,
+                quantity: receiptItems.quantity,
+                unitPrice: receiptItems.unitPrice,
+                amount: receiptItems.amount,
+                category: sql<
+                  string | null
+                >`coalesce(${receiptItems.category}, ${extractions.category})`,
+                normalizedName: receiptItems.normalizedName,
+                brand: receiptItems.brand,
+                size: receiptItems.size,
+                sizeUnit: receiptItems.sizeUnit,
+                avoidability: receiptItems.avoidability,
+              })
+              .from(receiptsRaw)
+              .innerJoin(extractions, join)
+              .innerJoin(
+                receiptItems,
+                and(eq(receiptItems.extractionId, extractions.id), eq(receiptItems.userId, userId)),
+              )
+              .where(and(where, inArray(receiptsRaw.id, ids)))
+              .orderBy(desc(when), asc(receiptsRaw.id), asc(receiptItems.position));
+      return { receipts, items, next };
+    },
+
+    /** Nomi armonizzati salvati dall'ultimo ricalcolo, per variante. */
+    async storedMerchantNames(userId: string) {
+      return db
+        .select({ variantKey: merchantNames.variantKey, name: merchantNames.name })
+        .from(merchantNames)
+        .where(eq(merchantNames.userId, userId));
+    },
+
+    /** Riscrive i nomi armonizzati dell'utente; il lock serializza i ricalcoli concorrenti. */
+    async saveMerchantNames(userId: string, rows: { variantKey: string; name: string | null }[]) {
+      await db.transaction(async (tx) => {
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`merchants:${userId}`}))`);
+        await tx.delete(merchantNames).where(eq(merchantNames.userId, userId));
+        for (let i = 0; i < rows.length; i += 500) {
+          await tx
+            .insert(merchantNames)
+            .values(rows.slice(i, i + 500).map((r) => ({ userId, ...r })));
+        }
+      });
     },
 
     /**

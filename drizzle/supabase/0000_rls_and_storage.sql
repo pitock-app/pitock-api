@@ -15,6 +15,9 @@ alter table public.user_api_keys enable row level security;
 alter table public.llm_usage enable row level security;
 alter table public.model_prices enable row level security;
 alter table public.stats_monthly enable row level security;
+alter table public.merchant_names enable row level security;
+-- Solo backend, nessuna policy: contatori del rate limit.
+alter table public.rate_limits enable row level security;
 
 drop policy if exists receipts_raw_owner_select on public.receipts_raw;
 create policy receipts_raw_owner_select on public.receipts_raw
@@ -38,6 +41,10 @@ create policy llm_usage_owner_select on public.llm_usage
 
 drop policy if exists stats_monthly_owner_select on public.stats_monthly;
 create policy stats_monthly_owner_select on public.stats_monthly
+  for select to authenticated using (user_id = (select auth.uid()));
+
+drop policy if exists merchant_names_owner_select on public.merchant_names;
+create policy merchant_names_owner_select on public.merchant_names
   for select to authenticated using (user_id = (select auth.uid()));
 
 -- user_api_keys: RLS attiva e nessuna policy. Solo il backend (ruolo privilegiato) vi accede.

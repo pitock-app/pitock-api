@@ -291,6 +291,25 @@ describe("extract-receipt: PDF", () => {
   });
 });
 
+describe("extract-receipt: tempo scaduto", () => {
+  it("passa al modello un segnale di interruzione e a tempo scaduto segna TIMEOUT", async () => {
+    const user = await h.t.createUser();
+    const { receiptId } = await uploaded(h, user);
+    h.llm.respond((req) => {
+      expect(req.abortSignal).toBeInstanceOf(AbortSignal);
+      expect(req.abortSignal?.aborted).toBe(false);
+      return new LlmError("timeout", "tempo scaduto");
+    });
+    await runJobs(h);
+    // Nessun retry: il budget è finito.
+    expect(h.llm.requests).toHaveLength(1);
+    expect((await detail(h, user, receiptId)).receipt).toMatchObject({
+      status: "failed",
+      errorCode: "TIMEOUT",
+    });
+  });
+});
+
 describe("/api/inngest", () => {
   it("è montato fuori da /v1 e rifiuta le richieste senza firma Inngest", async () => {
     for (const method of ["GET", "POST"]) {

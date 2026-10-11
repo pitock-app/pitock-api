@@ -1,3 +1,4 @@
+import { getDeadline } from "@vercel/functions";
 import { LlmError, type LlmFile, type LlmPort, type LlmUsage } from "../../ports/llm.port.js";
 import type { Clock } from "../../ports/clock.port.js";
 import type { QueueEvents, QueuePort } from "../../ports/queue.port.js";
@@ -22,6 +23,20 @@ import { splitTallImage } from "./tiles.js";
 /** Tentativi per l'output non valido: la prima chiamata più un retry (sezione 7). */
 export const MAX_ATTEMPTS = 2;
 
+/**
+ * Tempo massimo per tutte le chiamate al modello di un'estrazione (retry e fallback compresi).
+ * Su Vercel il budget si ricava dalla scadenza reale della funzione (`getDeadline`), lasciando
+ * `LLM_BUDGET_MARGIN_MS` per salvare il risultato o segnare lo scontrino `failed` con `TIMEOUT`
+ * invece di essere interrotti a metà. Fuori da Vercel (sviluppo, test) vale il massimo.
+ */
+export const LLM_BUDGET_MS = 240_000;
+export const LLM_BUDGET_MARGIN_MS = 15_000;
+
+export function llmBudgetMs(deadline: Date | undefined, now: number): number {
+  if (!deadline) return LLM_BUDGET_MS;
+  return Math.max(1_000, Math.min(LLM_BUDGET_MS, deadline.getTime() - now - LLM_BUDGET_MARGIN_MS));
+}
+
 export interface ExtractionDeps {
   receipts: ReceiptsRepo;
   extractions: ExtractionsRepo;
@@ -31,6 +46,8 @@ export interface ExtractionDeps {
   storage: StoragePort;
   queue: QueuePort;
   clock: Clock;
+  /** Di default ricavato da `llmBudgetMs`; i test lo fissano. */
+  llmBudgetMs?: number;
 }
 
 export type ExtractionOutcome =
@@ -55,6 +72,8 @@ const errorCodeFor = (e: LlmError, config: AiConfig): ExtractionErrorCode => {
       return config.keySource === "user" ? "USER_KEY_INVALID" : "LLM_UNAVAILABLE";
     case "quota":
       return config.keySource === "user" ? "USER_KEY_QUOTA" : "LLM_UNAVAILABLE";
+    case "timeout":
+      return "TIMEOUT";
     case "unavailable":
       return "LLM_UNAVAILABLE";
   }
@@ -80,6 +99,9 @@ export function createExtractionService(d: ExtractionDeps) {
       const mimeType = r.mimeType as MimeType;
       const operation = reextract ? ("reextract" as const) : ("extract" as const);
       const calls: NewLlmUsage[] = [];
+      const deadline = AbortSignal.timeout(
+        d.llmBudgetMs ?? llmBudgetMs(getDeadline(), d.clock.now().getTime()),
+      );
       const prices = new Map<string, ModelPrice | undefined>();
 
       const record = async (
@@ -123,6 +145,7 @@ export function createExtractionService(d: ExtractionDeps) {
               prompt: files.length > 1 ? tiledPrompt(files.length) : EXTRACTION_PROMPT,
               files,
               schema: ReceiptExtraction,
+              abortSignal: deadline,
             });
             const parsed = ReceiptExtraction.safeParse(res.output);
             if (!parsed.success) {

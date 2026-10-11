@@ -13,16 +13,34 @@ if (!databaseUrl) {
   process.exit(1);
 }
 
-// lock_timeout (ms): se una query dell'API tiene un lock sulle tabelle, la migrazione fallisce
-// subito invece di restare in coda (e bloccare a sua volta le letture) fino allo statement_timeout.
-const client = postgres(databaseUrl, {
-  prepare: false,
-  max: 1,
-  connection: { lock_timeout: 10_000 },
-});
+/**
+ * Il pooler di Supabase in modalità transaction (porta 6543) ignora i parametri di sessione,
+ * compresi quelli passati alla connessione: le migrazioni passano dal pooler in modalità
+ * session (porta 5432 dello stesso host), dove un `SET` vale per tutta la connessione.
+ * `MIGRATION_DATABASE_URL` permette di indicare un'altra stringa (es. connessione diretta).
+ */
+function migrationUrl(url: string): string {
+  if (process.env.MIGRATION_DATABASE_URL) return process.env.MIGRATION_DATABASE_URL;
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname.endsWith(".pooler.supabase.com") && parsed.port === "6543") {
+      parsed.port = "5432";
+      return parsed.toString();
+    }
+  } catch {
+    // Stringa non in formato URL: si usa così com'è.
+  }
+  return url;
+}
+
+const client = postgres(migrationUrl(databaseUrl), { prepare: false, max: 1 });
 const db = drizzle(client);
 
 try {
+  // Se una query dell'API tiene un lock su una tabella da modificare, la migrazione fallisce
+  // dopo 10 s invece di restare in coda (bloccando a sua volta le letture) fino allo
+  // statement_timeout. Con `max: 1` il SET vale per tutte le istruzioni che seguono.
+  await client`set lock_timeout = '10s'`;
   await migrate(db, { migrationsFolder: "drizzle" });
   console.log("Migrazioni Drizzle applicate.");
 

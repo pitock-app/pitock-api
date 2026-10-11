@@ -71,7 +71,16 @@ export function createApp(env: Env, opts: AppOptions = {}) {
   });
 
   app.use("/v1/*", requireAuth());
-  app.use("/v1/*", rateLimit({ rule: rateLimitRule }));
+  app.use(
+    "/v1/*",
+    rateLimit({
+      rule: rateLimitRule,
+      store: container.rateLimits,
+      onStoreError: (err) => {
+        logger.warn({ err }, "rate limit non disponibile");
+      },
+    }),
+  );
 
   app.onError(onError);
   app.notFound(onNotFound);

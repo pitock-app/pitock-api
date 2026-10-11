@@ -39,9 +39,14 @@ const logProviderError = (err: unknown) => {
   console.warn(JSON.stringify(redact({ level: 40, msg: "llm provider error", ...detail })));
 };
 
+/** Chiamata interrotta da `abortSignal` (AbortSignal.timeout lancia TimeoutError). */
+const isAbort = (err: unknown) =>
+  err instanceof Error && (err.name === "AbortError" || err.name === "TimeoutError");
+
 /** Classifica gli errori del provider; il messaggio restituito non riporta chiave, richiesta o risposta. */
 export function classifyLlmError(err: unknown): LlmError {
   if (err instanceof LlmError) return err;
+  if (isAbort(err)) return new LlmError("timeout", "Tempo scaduto per la chiamata al modello");
   logProviderError(err);
   if (NoObjectGeneratedError.isInstance(err)) {
     return new LlmError("invalid_output", "Output del modello non valido", toUsage(err.usage));
@@ -83,6 +88,7 @@ export function createAiSdkLlm(modelFactory: ModelFactory = createProviderModel)
           output: Output.object({ schema: req.schema }),
           instructions: req.instructions,
           maxRetries: 1,
+          ...(req.abortSignal ? { abortSignal: req.abortSignal } : {}),
           messages: [
             {
               role: "user",

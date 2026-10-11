@@ -58,7 +58,22 @@ export const StatsResponse = z
     description: "Statistiche sulle estrazioni correnti degli scontrini estratti",
   });
 
-export const StatsDatasetQuery = StatsQuery.omit({ granularity: true });
+/** Scontrini per pagina del dataset: ~1–2 MB di JSON, sotto il limite di 4,5 MB di Vercel. */
+export const DATASET_PAGE_DEFAULT = 500;
+export const DATASET_PAGE_MAX = 1000;
+
+export const StatsDatasetQuery = StatsQuery.omit({ granularity: true }).extend({
+  cursor: z.string().max(300).optional().openapi({
+    description: "`nextCursor` della pagina precedente; assente per la prima pagina",
+  }),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(DATASET_PAGE_MAX)
+    .default(DATASET_PAGE_DEFAULT)
+    .openapi({ description: "Scontrini per pagina, con tutte le loro righe prodotto" }),
+});
 export type StatsDatasetQuery = z.infer<typeof StatsDatasetQuery>;
 
 export const StatsDatasetResponse = z
@@ -69,7 +84,11 @@ export const StatsDatasetResponse = z
     }),
     truncated: z.boolean().openapi({
       description:
-        "Vero se uno dei due elenchi supera il limite ed è stato tagliato ai più recenti",
+        "Vero se ci sono altri scontrini oltre questa pagina (equivale a `nextCursor` non null)",
+    }),
+    nextCursor: z.string().nullable().openapi({
+      description:
+        "Da passare come `cursor` per la pagina successiva; null all'ultima pagina. Le pagine vanno dal più recente al più vecchio",
     }),
     receipts: z.array(
       z
@@ -119,5 +138,5 @@ export const StatsDatasetResponse = z
   })
   .openapi("StatsDataset", {
     description:
-      "Scontrini e righe prodotto del periodo (estrazioni correnti degli scontrini estratti), dal più recente",
+      "Una pagina di scontrini del periodo (estrazioni correnti degli scontrini estratti), dal più recente, con tutte le loro righe prodotto",
   });

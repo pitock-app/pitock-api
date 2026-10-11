@@ -43,11 +43,24 @@ export const statsRoutes = () =>
       return c.json(res, 200);
     });
 
-/** `GET /cron/recompute-stats` (Vercel Cron): fuori da `/v1` e dal contratto pubblico. */
+/**
+ * `GET /cron/recompute-stats` (Vercel Cron, ogni giorno): fuori da `/v1` e dal contratto
+ * pubblico. Prima le pulizie (estrazioni bloccate, upload mai completati), poi il ricalcolo.
+ */
 export const statsCronRoutes = (cronSecret: string | undefined) =>
   createRouter().get("/cron/recompute-stats", requireCronSecret(cronSecret), async (c) => {
-    const res = await c.get("container").stats.recomputeAll();
-    if (res.failed > 0)
-      c.get("logger").error(res, "recompute-stats: ricalcolo fallito per alcuni utenti");
-    return c.json({ ok: res.failed === 0, ...res }, 200);
+    const container = c.get("container");
+    const logger = c.get("logger");
+    let cleanup: Awaited<ReturnType<typeof container.maintenance.cleanup>> | null = null;
+    try {
+      cleanup = await container.maintenance.cleanup();
+      if (cleanup.failedProcessing > 0 || cleanup.deletedUploads > 0)
+        logger.info(cleanup, "cron: pulizie eseguite");
+    } catch (err) {
+      // Le pulizie non devono impedire il ricalcolo: riprovano al prossimo giro.
+      logger.error({ err }, "cron: pulizie fallite");
+    }
+    const res = await container.stats.recomputeAll();
+    if (res.failed > 0) logger.error(res, "recompute-stats: ricalcolo fallito per alcuni utenti");
+    return c.json({ ok: res.failed === 0 && cleanup !== null, ...res, cleanup }, 200);
   });

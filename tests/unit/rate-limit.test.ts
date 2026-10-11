@@ -3,10 +3,14 @@ import { describe, expect, it } from "vitest";
 import { rateLimitRule } from "../../src/app.js";
 import { onError } from "../../src/middleware/error-handler.js";
 import { createLogger } from "../../src/middleware/logger.js";
-import { rateLimit } from "../../src/middleware/rate-limit.js";
+import {
+  createMemoryRateLimitStore,
+  rateLimit,
+  type RateLimitStore,
+} from "../../src/middleware/rate-limit.js";
 import type { AppEnv } from "../../src/types.js";
 
-function setup(limit: number) {
+function setup(limit: number, store: RateLimitStore = createMemoryRateLimitStore()) {
   let t = 0;
   const app = new Hono<AppEnv>();
   app.use("*", async (c, next) => {
@@ -15,7 +19,7 @@ function setup(limit: number) {
     c.set("userId", c.req.header("x-user") ?? "u1");
     await next();
   });
-  app.use("*", rateLimit({ rule: () => ({ bucket: "b", limit }), now: () => t }));
+  app.use("*", rateLimit({ rule: () => ({ bucket: "b", limit }), store, now: () => t }));
   app.get("*", (c) => c.text("ok"));
   app.onError(onError);
   return { app, advance: (ms: number) => (t += ms) };
@@ -33,6 +37,14 @@ describe("rate limit in memoria", () => {
     // Un altro utente non è toccato.
     expect((await app.request("/a", { headers: { "x-user": "u2" } })).status).toBe(200);
     advance(60_000);
+    expect((await app.request("/a")).status).toBe(200);
+  });
+
+  it("se il contatore non risponde la richiesta passa comunque", async () => {
+    const broken: RateLimitStore = {
+      hit: () => Promise.reject(new Error("db giù")),
+    };
+    const { app } = setup(0, broken);
     expect((await app.request("/a")).status).toBe(200);
   });
 

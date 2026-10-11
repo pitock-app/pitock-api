@@ -5,6 +5,11 @@ import { z } from "zod";
 import { inngestDevMode, inngestServable } from "../../src/infra/queue/inngest.client.js";
 import { classifyLlmError, createAiSdkLlm } from "../../src/infra/llm/ai-sdk.adapter.js";
 import { ReceiptExtraction } from "../../src/modules/extraction/extraction.schema.js";
+import {
+  LLM_BUDGET_MARGIN_MS,
+  LLM_BUDGET_MS,
+  llmBudgetMs,
+} from "../../src/modules/extraction/extraction.service.js";
 import { postprocess } from "../../src/modules/extraction/postprocess.js";
 import { costUsd } from "../../src/modules/usage/pricing.js";
 import { LlmError } from "../../src/ports/llm.port.js";
@@ -215,5 +220,25 @@ describe("Inngest: modalità dev", () => {
     expect(inngestServable(testEnv())).toBe(true);
     expect(inngestServable(testEnv({ INNGEST_SIGNING_KEY: "" }))).toBe(false);
     expect(inngestServable(testEnv({ INNGEST_SIGNING_KEY: "", INNGEST_DEV: "1" }))).toBe(true);
+  });
+});
+
+describe("tempo a disposizione del modello", () => {
+  it("un'interruzione per timeout diventa LlmError timeout", () => {
+    const abort = new DOMException("The operation was aborted due to timeout", "TimeoutError");
+    expect(classifyLlmError(abort).kind).toBe("timeout");
+    const manual = new DOMException("Aborted", "AbortError");
+    expect(classifyLlmError(manual).kind).toBe("timeout");
+  });
+
+  it("il budget segue la scadenza della funzione, con un margine e un massimo", () => {
+    const now = Date.parse("2026-10-11T10:00:00Z");
+    expect(llmBudgetMs(undefined, now)).toBe(LLM_BUDGET_MS);
+    // 300 s di funzione: tetto a LLM_BUDGET_MS.
+    expect(llmBudgetMs(new Date(now + 300_000), now)).toBe(LLM_BUDGET_MS);
+    // 60 s (vecchi limiti): resta il margine per salvare l'esito.
+    expect(llmBudgetMs(new Date(now + 60_000), now)).toBe(60_000 - LLM_BUDGET_MARGIN_MS);
+    // Scadenza già passata: un minimo simbolico, la chiamata fallirà subito.
+    expect(llmBudgetMs(new Date(now - 1), now)).toBe(1_000);
   });
 });

@@ -99,11 +99,14 @@ pnpm simulate:upload fixtures/receipts   # terminal 3 — behaves like the web a
 `simulate:upload` also needs `SIMULATE_EMAIL`, `SIMULATE_PASSWORD`, `SUPABASE_URL` and `SUPABASE_ANON_KEY`.
 
 > [!TIP]
-> `pnpm db:migrate` sets `lock_timeout = 10s`. If a running API query holds a lock on a table
-> the migration wants to alter, it fails fast instead of queueing for the whole `statement_timeout`
-> (2 min on Supabase) — and blocking every other read of that table meanwhile. Find the blocker with
-> `pg_stat_activity` / `pg_locks`, end it with `pg_terminate_backend(pid)` and run the migration again.
-> Want a populated dashboard right away? `pnpm seed:demo` creates a demo user with one year of spending.
+> `pnpm db:migrate` runs through the Supabase pooler in **session** mode (port `5432`, or
+> `MIGRATION_DATABASE_URL`) and sets `lock_timeout = 10s` — the transaction pooler (`6543`) silently
+> ignores session settings. If a running API query holds a lock on a table the migration wants to
+> alter, the migration fails fast instead of queueing for the whole `statement_timeout` (2 min) and
+> blocking every other read of that table meanwhile. Find the blocker with `pg_stat_activity` /
+> `pg_locks`, end it with `pg_terminate_backend(pid)` and run the migration again.
+
+Want a populated dashboard right away? `pnpm seed:demo` creates a demo user with one year of spending.
 
 ---
 
@@ -158,7 +161,7 @@ the web app generates its TypeScript types from it.
 | Extractions | `PATCH /v1/extractions/{id}` — manual correction, creates a new current version                                                                                                                                                                                                                                     |
 | AI settings | `GET/PUT /v1/settings/ai` · `PUT/DELETE /v1/settings/ai/keys/{provider}` · `GET /v1/settings/ai/models?provider=` · `POST /v1/settings/ai/test`                                                                                                                                                                     |
 | Usage       | `GET /v1/usage` · `GET /v1/usage/calls`                                                                                                                                                                                                                                                                             |
-| Stats       | `GET /v1/stats?from&to&granularity=month\|year` · `GET /v1/stats/dataset?from&to`                                                                                                                                                                                                                                   |
+| Stats       | `GET /v1/stats?from&to&granularity=month\|year` · `GET /v1/stats/dataset?from&to&cursor&limit` (pages of up to 1000 receipts with all their lines, `nextCursor`)                                                                                                                                                    |
 
 Example:
 
@@ -255,6 +258,21 @@ using the stored `cost_usd` when present, else the current price in `model_price
 **Pre-aggregates.** `stats_monthly` (month × category) is rewritten by the Inngest function
 `recompute-stats` after every extraction, correction, manual entry or deletion, and by a daily
 Vercel cron (`03:00 UTC`, `GET /cron/recompute-stats`). A Postgres advisory lock serializes concurrent recomputes per user.
+The same recompute stores the harmonized merchant names in `merchant_names`, so stats requests no
+longer re-harmonize the whole history (they still do, as a fallback, for a variant newer than the last recompute).
+
+**Housekeeping.** Before recomputing, the daily cron:
+
+| Stuck state                    | After  | Action                                              |
+| ------------------------------ | ------ | --------------------------------------------------- |
+| `processing`                   | 10 min | → `failed` with `TIMEOUT` (the user can re-extract) |
+| `pending_upload`               | 1 h    | file and row deleted                                |
+| expired `rate_limits` counters | 1 h    | deleted                                             |
+
+**Time budget of an extraction.** All model calls of one extraction (retry and BYOK fallback
+included) share one deadline: $\min(240\,\text{s},\ \text{function deadline} - 15\,\text{s})$, read with
+`getDeadline()` from `@vercel/functions`. When it runs out the call is aborted and the receipt ends
+`failed` with `TIMEOUT`, instead of being killed by the platform halfway through.
 
 ---
 
@@ -280,7 +298,7 @@ src/
 
 ## 🔒 Security
 
-- JWTs verified against Supabase JWKS; CORS allow-list; secure headers; per-route rate limits.
+- JWTs verified against Supabase JWKS; CORS allow-list; secure headers; per-user rate limits shared by every Vercel instance (atomic upsert on `rate_limits`; if the counter is unreachable the request is served and a warning logged).
 - BYOK keys: AES-256-GCM, random 12-byte IV, `key_version` for rotation; plaintext exists only in memory during the call — never in logs, responses or events.
 - Logs redact tokens and keys; storage access only through short-lived signed URLs.
 - Account deletion removes files, rows and the Auth user; every step is idempotent and can be retried.
