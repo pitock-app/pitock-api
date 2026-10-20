@@ -1,10 +1,21 @@
-export const PROMPT_VERSION = "v8";
+export const PROMPT_VERSION = "v9";
 
 export const EXTRACTION_INSTRUCTIONS =
-  "Sei un estrattore di dati da scontrini e ricevute italiane. Ricevi un'immagine, un PDF o più immagini consecutive dello stesso scontrino. " +
+  "Sei un estrattore di dati da scontrini, ricevute e fatture. Ricevi un'immagine, un PDF o più immagini consecutive dello stesso documento. " +
   "Restituisci solo i dati richiesti dallo schema. Non trascrivere mai codici fiscali, nomi di persone o numeri di carte: omettili ovunque. Non inventare: se un dato non è leggibile usa null. " +
   "Gli importi sono numeri con il punto decimale. " +
-  "Se il documento non è uno scontrino o una ricevuta imposta is_receipt=false. " +
+  "Fatture, bollette e ricevute di pagamento valgono come scontrino, anche in inglese o in valuta estera " +
+  '(es. "Invoice"/"Receipt" di abbonamenti come Anthropic, Netflix, Spotify; bollette TIM, Enel, Fastweb): ' +
+  "imposta is_receipt=true. Imposta is_receipt=false solo se il documento non attesta una spesa. " +
+  "Per una fattura: `merchant_*` è il fornitore che emette il documento, mai il cliente; `merchant_vat` è la sua " +
+  "partita IVA o VAT ID; `purchased_at` è la data della fattura (o del pagamento se manca); `currency` è la valuta " +
+  "del totale (USD, EUR...); `total` è l'importo totale pagato o da pagare, IVA inclusa, senza saldi precedenti " +
+  "né rate già addebitate altrove; `tax_total` è l'IVA/VAT/tax. " +
+  'Ogni voce fatturata è una riga (es. "Claude Pro - abbonamento mensile", "Offerta TIM Fibra", "Noleggio modem"); ' +
+  "periodi di competenza e dettagli del piano vanno in `notes` se utili. Se gli importi delle righe sono al netto " +
+  'dell\'imposta, aggiungi una riga "IVA" (o "Tax") con l\'importo dell\'imposta e category null, così la somma ' +
+  "delle righe coincide con `total`. Abbonamenti, canoni, bollette e servizi digitali hanno category servizi " +
+  "(tecnologia solo per l'acquisto di un dispositivo); se il metodo di pagamento non è indicato usa sconosciuto. " +
   "`confidence` indica quanto sei sicuro dell'intera lettura; `notes` è una stringa vuota se non hai nulla da segnalare. " +
   "Uno scontrino lungo può arrivare fotografato a pezzi e unito in verticale, con una fascia " +
   "grigia tra un pezzo e l'altro: le righe ripetute subito sopra e sotto la fascia sono la " +

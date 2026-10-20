@@ -10,7 +10,7 @@ import {
   LLM_BUDGET_MS,
   llmBudgetMs,
 } from "../../src/modules/extraction/extraction.service.js";
-import { postprocess } from "../../src/modules/extraction/postprocess.js";
+import { EUR_RATES, postprocess } from "../../src/modules/extraction/postprocess.js";
 import { costUsd } from "../../src/modules/usage/pricing.js";
 import { LlmError } from "../../src/ports/llm.port.js";
 import { JPEG, PDF, validOutput } from "../helpers/fakes.js";
@@ -19,6 +19,16 @@ import { testEnv } from "../helpers/test-env.js";
 const parse = (o: Record<string, unknown> = {}) => ReceiptExtraction.parse(validOutput(o));
 
 describe("postprocess", () => {
+  it("converte in euro gli importi in USD con un cambio indicativo", () => {
+    const r = postprocess(parse({ currency: "usd" }));
+    const base = postprocess(parse());
+    expect(r.fields.currency).toBe("EUR");
+    expect(r.fields.total).toBe(Number(((base.fields.total ?? 0) * EUR_RATES.USD!).toFixed(2)));
+    expect(r.items[0]!.amount).toBe(Number(((base.items[0]!.amount ?? 0) * EUR_RATES.USD!).toFixed(2)));
+    expect(r.fields.notes).toContain("USD");
+    expect(postprocess(parse({ currency: "JPY" })).fields.currency).toBe("JPY");
+  });
+
   it("mantiene la confidenza se la somma delle righe coincide con il totale", () => {
     const r = postprocess(parse());
     expect(r.isReceipt).toBe(true);

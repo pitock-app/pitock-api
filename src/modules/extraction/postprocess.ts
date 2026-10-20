@@ -19,6 +19,10 @@ const round = (n: number | null, digits: number) =>
 /** Testo ripulito; null se vuoto o assente. */
 const clean = (text: string | null | undefined) => text?.trim() || null;
 
+// ponytail: cambi fissi e approssimativi, da aggiornare a mano; un'API dei cambi se serve precisione.
+/** Euro per un'unità di valuta estera. */
+export const EUR_RATES: Record<string, number> = { USD: 0.86, GBP: 1.15, CHF: 1.07 };
+
 const appendNote = (notes: string | null, note: string) => (notes ? `${notes}\n${note}` : note);
 
 /** Normalizza l'output del modello e ne abbassa la confidenza se i conti non tornano. */
@@ -39,6 +43,17 @@ export function postprocess(out: ReceiptExtraction): PostprocessResult {
     }
   }
 
+  const currency = out.currency.toUpperCase();
+  const rate = EUR_RATES[currency];
+  if (rate && total !== null) {
+    notes = appendNote(
+      notes,
+      `Importo originale ${total.toFixed(2)} ${currency}, convertito in EUR al cambio indicativo ${rate}.`,
+    );
+  }
+  /** Importo in euro se la valuta ha un cambio noto, altrimenti invariato. */
+  const eur = (n: number | null) => (rate && n !== null ? n * rate : n);
+
   return {
     isReceipt: out.is_receipt,
     confidence,
@@ -49,9 +64,9 @@ export function postprocess(out: ReceiptExtraction): PostprocessResult {
       merchantAddress: out.merchant_address,
       // Senza fuso vale Europe/Rome; una data illeggibile diventa null.
       purchasedAt: out.purchased_at ? parseIsoInTimeZone(out.purchased_at) : null,
-      currency: out.currency.toUpperCase(),
-      total,
-      taxTotal: round(out.tax_total, 2),
+      currency: rate ? "EUR" : currency,
+      total: round(eur(total), 2),
+      taxTotal: round(eur(out.tax_total), 2),
       paymentMethod: out.payment_method,
       category: out.category,
       avoidability: out.avoidability ?? null,
@@ -60,8 +75,8 @@ export function postprocess(out: ReceiptExtraction): PostprocessResult {
     items: out.items.map((i) => ({
       description: i.description,
       quantity: round(i.quantity, 3),
-      unitPrice: round(i.unit_price, 2),
-      amount: round(i.amount, 2),
+      unitPrice: round(eur(i.unit_price), 2),
+      amount: round(eur(i.amount), 2),
       vatRate: round(i.vat_rate, 2),
       category: i.category,
       normalizedName: clean(i.normalized_name),

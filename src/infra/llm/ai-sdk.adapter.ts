@@ -98,7 +98,7 @@ export function createAiSdkLlm(modelFactory: ModelFactory = createProviderModel)
                   type: "file" as const,
                   mediaType: file.mimeType,
                   data: file.bytes,
-                  ...(file.mimeType === "application/pdf" ? { filename: "scontrino.pdf" } : {}),
+                  ...(file.mimeType === "application/pdf" ? { filename: "documento.pdf" } : {}),
                 })),
               ],
             },

@@ -45,7 +45,7 @@ describe("extract-receipt: successo", () => {
       provider: "anthropic",
       model: "fake-model",
       keySource: "platform",
-      promptVersion: "v8",
+      promptVersion: "v9",
       purchasedAt: "2026-10-03T16:30:00.000Z",
       avoidability: "utile",
     });
