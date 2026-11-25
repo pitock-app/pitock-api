@@ -40,11 +40,16 @@ export function postprocess(out: ReceiptExtraction): PostprocessResult {
   const products = out.items.filter((i) => !isBreakdownLine(i.description));
 
   const amounts = products.map((i) => i.amount).filter((a): a is number => a !== null);
+  /** Fattore per portare le righe a IVA inclusa; 1 se sono già importi pagati. */
+  let gross = 1;
   if (total !== null && amounts.length > 0) {
     const sum = amounts.reduce((acc, a) => acc + a, 0);
-    // Righe al netto IVA (fatture): tornano col totale aggiungendo `tax_total`.
     const matches = (s: number) => Math.abs(s - total) <= SUM_TOLERANCE;
-    if (!matches(sum) && !(taxTotal !== null && matches(sum + taxTotal))) {
+    // Righe al netto IVA (fatture) che tornano col totale solo aggiungendo `tax_total`: si salva
+    // il prezzo pagato, ripartendo l'IVA sulle righe in proporzione al loro importo.
+    if (!matches(sum) && taxTotal !== null && sum > 0 && matches(sum + taxTotal)) {
+      gross = total / sum;
+    } else if (!matches(sum)) {
       confidence = Math.min(confidence, LOW_CONFIDENCE);
       notes = appendNote(
         notes,
@@ -85,8 +90,8 @@ export function postprocess(out: ReceiptExtraction): PostprocessResult {
     items: products.map((i) => ({
       description: i.description,
       quantity: round(i.quantity, 3),
-      unitPrice: round(eur(i.unit_price), 2),
-      amount: round(eur(i.amount), 2),
+      unitPrice: round(eur(i.unit_price === null ? null : i.unit_price * gross), 2),
+      amount: round(eur(i.amount === null ? null : i.amount * gross), 2),
       vatRate: round(i.vat_rate, 2),
       category: i.category,
       normalizedName: clean(i.normalized_name),

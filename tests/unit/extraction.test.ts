@@ -127,6 +127,36 @@ describe("postprocess", () => {
     expect(r.confidence).toBe(0.92);
   });
 
+  it("porta a IVA inclusa le righe di una fattura al netto: si salva il prezzo pagato", () => {
+    const line = (description: string, quantity: number, unit_price: number, amount: number) => ({
+      description,
+      quantity,
+      unit_price,
+      amount,
+      vat_rate: 22,
+      category: null,
+    });
+    const r = postprocess(
+      parse({
+        total: 305,
+        tax_total: 55,
+        items: [line("Rifacimento tetto auto", 1, 200, 200), line("Materiali", 2, 25, 50)],
+      }),
+    );
+    expect(r.items.map((i) => [i.amount, i.unitPrice])).toEqual([
+      [244, 244],
+      [61, 30.5],
+    ]);
+    expect(r.items.reduce((sum, i) => sum + (i.amount ?? 0), 0)).toBe(305);
+    expect(r.fields.total).toBe(305);
+    expect(r.confidence).toBe(0.92);
+  });
+
+  it("non tocca le righe che tornano già col totale, anche con tax_total", () => {
+    const r = postprocess(parse({ tax_total: 2.22 }));
+    expect(r.items.map((i) => i.amount)).toEqual(postprocess(parse()).items.map((i) => i.amount));
+  });
+
   it("riconosce le righe di scorporo senza toccare i prodotti", () => {
     for (const d of ["IVA", "I.V.A. 22%", "Accise e IVA", "SCONTO 20%", "Subtotale", "VAT - Italy"])
       expect(isBreakdownLine(d), d).toBe(true);

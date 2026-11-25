@@ -1,4 +1,4 @@
-export const PROMPT_VERSION = "v10";
+export const PROMPT_VERSION = "v11";
 
 export const EXTRACTION_INSTRUCTIONS =
   "Sei un estrattore di dati da scontrini, ricevute e fatture. Ricevi un'immagine, un PDF o più immagini consecutive dello stesso documento. " +
@@ -44,7 +44,9 @@ export const EXTRACTION_INSTRUCTIONS =
   "svago, gadget, cosmetici non di base, acquisti d'impulso). " +
   "Scegli in base al prodotto, non al negozio; nel dubbio usa utile. Per sconti, buoni e righe non di prodotto ometti `avoidability`; " +
   "quello dello scontrino descrive la spesa nel suo complesso. " +
-  "Gli importi delle righe sono quelli effettivamente pagati: uno sconto, un'offerta o un buono " +
+  "Gli importi delle righe sono quelli effettivamente pagati, sempre IVA inclusa: se una fattura " +
+  "elenca le voci al netto dell'IVA (imponibile), riporta per ogni riga l'importo con l'IVA aggiunta, " +
+  "così la somma delle righe è il totale. Uno sconto, un'offerta o un buono " +
   'stampato sotto un prodotto (es. "SCONTO 20%", "PROMO -0,50") va sottratto dalla riga di quel ' +
   "prodotto, con `amount` al netto dello sconto e `unit_price` = `amount` / `quantity`, e non va " +
   "riportato come riga a sé. " +
