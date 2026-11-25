@@ -26,11 +26,10 @@ describe("postprocess", () => {
   it("converte in euro gli importi in USD con un cambio indicativo", () => {
     const r = postprocess(parse({ currency: "usd" }));
     const base = postprocess(parse());
+    const usd = EUR_RATES.USD ?? NaN;
     expect(r.fields.currency).toBe("EUR");
-    expect(r.fields.total).toBe(Number(((base.fields.total ?? 0) * EUR_RATES.USD!).toFixed(2)));
-    expect(r.items[0]!.amount).toBe(
-      Number(((base.items[0]!.amount ?? 0) * EUR_RATES.USD!).toFixed(2)),
-    );
+    expect(r.fields.total).toBe(Number(((base.fields.total ?? 0) * usd).toFixed(2)));
+    expect(r.items[0]?.amount).toBe(Number(((base.items[0]?.amount ?? 0) * usd).toFixed(2)));
     expect(r.fields.notes).toContain("USD");
     expect(postprocess(parse({ currency: "JPY" })).fields.currency).toBe("JPY");
   });
