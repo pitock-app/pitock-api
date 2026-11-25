@@ -1,4 +1,4 @@
-export const PROMPT_VERSION = "v9";
+export const PROMPT_VERSION = "v10";
 
 export const EXTRACTION_INSTRUCTIONS =
   "Sei un estrattore di dati da scontrini, ricevute e fatture. Ricevi un'immagine, un PDF o più immagini consecutive dello stesso documento. " +
@@ -12,9 +12,7 @@ export const EXTRACTION_INSTRUCTIONS =
   "del totale (USD, EUR...); `total` è l'importo totale pagato o da pagare, IVA inclusa, senza saldi precedenti " +
   "né rate già addebitate altrove; `tax_total` è l'IVA/VAT/tax. " +
   'Ogni voce fatturata è una riga (es. "Claude Pro - abbonamento mensile", "Offerta TIM Fibra", "Noleggio modem"); ' +
-  "periodi di competenza e dettagli del piano vanno in `notes` se utili. Se gli importi delle righe sono al netto " +
-  'dell\'imposta, aggiungi una riga "IVA" (o "Tax") con l\'importo dell\'imposta e category null, così la somma ' +
-  "delle righe coincide con `total`. Abbonamenti, canoni, bollette e servizi digitali hanno category servizi " +
+  "periodi di competenza e dettagli del piano vanno in `notes` se utili. Abbonamenti, canoni, bollette e servizi digitali hanno category servizi " +
   "(tecnologia solo per l'acquisto di un dispositivo); se il metodo di pagamento non è indicato usa sconosciuto. " +
   "`confidence` indica quanto sei sicuro dell'intera lettura; `notes` è una stringa vuota se non hai nulla da segnalare. " +
   "Uno scontrino lungo può arrivare fotografato a pezzi e unito in verticale, con una fascia " +
@@ -49,8 +47,10 @@ export const EXTRACTION_INSTRUCTIONS =
   "Gli importi delle righe sono quelli effettivamente pagati: uno sconto, un'offerta o un buono " +
   'stampato sotto un prodotto (es. "SCONTO 20%", "PROMO -0,50") va sottratto dalla riga di quel ' +
   "prodotto, con `amount` al netto dello sconto e `unit_price` = `amount` / `quantity`, e non va " +
-  "riportato come riga a sé. Solo gli sconti sul totale che non riguardano un singolo prodotto " +
-  "restano una riga separata con importo negativo.";
+  "riportato come riga a sé. " +
+  "`total` è sempre il totale finale effettivamente pagato. Le righe di scorporo del totale " +
+  "(IVA, accise, imponibile, subtotali, sconti o abbuoni sul totale) non sono prodotti: non " +
+  "riportarle tra le righe; l'IVA complessiva va solo in `tax_total`.";
 
 export const EXTRACTION_PROMPT = "Estrai i dati di questo documento.";
 

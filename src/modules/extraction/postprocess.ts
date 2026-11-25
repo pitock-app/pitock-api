@@ -25,16 +25,26 @@ export const EUR_RATES: Record<string, number> = { USD: 0.86, GBP: 1.15, CHF: 1.
 
 const appendNote = (notes: string | null, note: string) => (notes ? `${notes}\n${note}` : note);
 
+/** Righe di scorporo del totale (IVA, accise, sconti...): non sono prodotti e non si tracciano. */
+const BREAKDOWN_LINE =
+  /^\W*(i\.?v\.?a|vat|accise|imponibile|sub\s?totale|totale|sconto|sconti|abbuono)(?![a-z])/i;
+
+export const isBreakdownLine = (description: string) => BREAKDOWN_LINE.test(description);
+
 /** Normalizza l'output del modello e ne abbassa la confidenza se i conti non tornano. */
 export function postprocess(out: ReceiptExtraction): PostprocessResult {
   let confidence = out.confidence;
   let notes = out.notes || null;
   const total = round(out.total, 2);
+  const taxTotal = round(out.tax_total, 2);
+  const products = out.items.filter((i) => !isBreakdownLine(i.description));
 
-  const amounts = out.items.map((i) => i.amount).filter((a): a is number => a !== null);
+  const amounts = products.map((i) => i.amount).filter((a): a is number => a !== null);
   if (total !== null && amounts.length > 0) {
     const sum = amounts.reduce((acc, a) => acc + a, 0);
-    if (Math.abs(sum - total) > SUM_TOLERANCE) {
+    // Righe al netto IVA (fatture): tornano col totale aggiungendo `tax_total`.
+    const matches = (s: number) => Math.abs(s - total) <= SUM_TOLERANCE;
+    if (!matches(sum) && !(taxTotal !== null && matches(sum + taxTotal))) {
       confidence = Math.min(confidence, LOW_CONFIDENCE);
       notes = appendNote(
         notes,
@@ -66,13 +76,13 @@ export function postprocess(out: ReceiptExtraction): PostprocessResult {
       purchasedAt: out.purchased_at ? parseIsoInTimeZone(out.purchased_at) : null,
       currency: rate ? "EUR" : currency,
       total: round(eur(total), 2),
-      taxTotal: round(eur(out.tax_total), 2),
+      taxTotal: round(eur(taxTotal), 2),
       paymentMethod: out.payment_method,
       category: out.category,
       avoidability: out.avoidability ?? null,
       notes,
     },
-    items: out.items.map((i) => ({
+    items: products.map((i) => ({
       description: i.description,
       quantity: round(i.quantity, 3),
       unitPrice: round(eur(i.unit_price), 2),

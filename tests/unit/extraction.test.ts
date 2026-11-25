@@ -10,7 +10,11 @@ import {
   LLM_BUDGET_MS,
   llmBudgetMs,
 } from "../../src/modules/extraction/extraction.service.js";
-import { EUR_RATES, postprocess } from "../../src/modules/extraction/postprocess.js";
+import {
+  EUR_RATES,
+  isBreakdownLine,
+  postprocess,
+} from "../../src/modules/extraction/postprocess.js";
 import { costUsd } from "../../src/modules/usage/pricing.js";
 import { LlmError } from "../../src/ports/llm.port.js";
 import { JPEG, PDF, validOutput } from "../helpers/fakes.js";
@@ -24,7 +28,9 @@ describe("postprocess", () => {
     const base = postprocess(parse());
     expect(r.fields.currency).toBe("EUR");
     expect(r.fields.total).toBe(Number(((base.fields.total ?? 0) * EUR_RATES.USD!).toFixed(2)));
-    expect(r.items[0]!.amount).toBe(Number(((base.items[0]!.amount ?? 0) * EUR_RATES.USD!).toFixed(2)));
+    expect(r.items[0]!.amount).toBe(
+      Number(((base.items[0]!.amount ?? 0) * EUR_RATES.USD!).toFixed(2)),
+    );
     expect(r.fields.notes).toContain("USD");
     expect(postprocess(parse({ currency: "JPY" })).fields.currency).toBe("JPY");
   });
@@ -94,6 +100,39 @@ describe("postprocess", () => {
   it("interpreta le date senza fuso in Europe/Rome e scarta quelle illeggibili", () => {
     expect(postprocess(parse()).fields.purchasedAt?.toISOString()).toBe("2026-10-03T16:30:00.000Z");
     expect(postprocess(parse({ purchased_at: "03/10/2026" })).fields.purchasedAt).toBeNull();
+  });
+
+  it("scarta le righe di scorporo (IVA, sconti) e tiene il totale finale", () => {
+    const line = (description: string, amount: number) => ({
+      description,
+      quantity: null,
+      unit_price: null,
+      amount,
+      vat_rate: null,
+      category: null,
+    });
+    const r = postprocess(
+      parse({
+        total: 21.96,
+        tax_total: 3.96,
+        items: [
+          line("Abbonamento", 18),
+          line("VAT - Italy (22% on €18.00)", 3.96),
+          line("Sconto", -1),
+        ],
+      }),
+    );
+    expect(r.fields.total).toBe(21.96);
+    expect(r.items.map((i) => i.description)).toEqual(["Abbonamento"]);
+    // Righe al netto IVA + tax_total = totale: nessuna penalità.
+    expect(r.confidence).toBe(0.92);
+  });
+
+  it("riconosce le righe di scorporo senza toccare i prodotti", () => {
+    for (const d of ["IVA", "I.V.A. 22%", "Accise e IVA", "SCONTO 20%", "Subtotale", "VAT - Italy"])
+      expect(isBreakdownLine(d), d).toBe(true);
+    for (const d of ["Libero IVA 4%", "Pane", "Ivanhoe libro", "Totalizzatore", "Bollo"])
+      expect(isBreakdownLine(d), d).toBe(false);
   });
 
   it("riporta is_receipt=false", () => {
