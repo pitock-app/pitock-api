@@ -46,6 +46,24 @@ const periodOf = (g: Granularity) =>
 
 const monthStart = sql<string>`to_char(${localWhen}, 'YYYY-MM-01')`;
 
+// shortcut: insegna o ragione sociale grezze, non i nomi armonizzati di merchants.ts; usarli se i doppioni disturbano.
+const merchantLabel = sql<string>`coalesce(${extractions.merchantBrand}, ${extractions.merchantName}, 'sconosciuto')`;
+const productName = sql<string>`coalesce(${receiptItems.normalizedName}, ${receiptItems.description})`;
+
+export const BREAKDOWN_LIMIT = 50;
+export const PRODUCT_NAMES_LIMIT = 300;
+export const RECEIPT_LIST_LIMIT = 20;
+
+export interface BreakdownQuery {
+  range: StatsRange;
+  groupBy: "none" | "category" | "month" | "merchant" | "product";
+  category?: string | undefined;
+  merchant?: string | undefined;
+  avoidability?: string | undefined;
+  /** Nomi esatti (senza distinzione di maiuscole) da `productNames`. */
+  products?: string[] | undefined;
+}
+
 /** Posizione di uno scontrino nell'ordinamento del dataset (data desc, id asc). */
 export interface DatasetPosition {
   at: string;
@@ -207,6 +225,106 @@ export function createStatsRepo(db: Db) {
               .where(and(where, inArray(receiptsRaw.id, ids)))
               .orderBy(desc(when), asc(receiptsRaw.id), asc(receiptItems.position));
       return { receipts, items, next };
+    },
+
+    /**
+     * Somma della spesa nel periodo, filtrata e raggruppata, per l'assistente.
+     * Con `products` o `groupBy: "product"` somma le righe prodotto, altrimenti i totali scontrino.
+     */
+    async breakdown(userId: string, q: BreakdownQuery) {
+      const { join, where } = base(userId, q.range);
+      const byItem = q.products !== undefined || q.groupBy === "product";
+      const item = and(
+        eq(receiptItems.extractionId, extractions.id),
+        eq(receiptItems.userId, userId),
+      );
+      const value = byItem ? receiptItems.amount : extractions.total;
+      const cat = byItem
+        ? sql<string>`coalesce(${receiptItems.category}, ${extractions.category}, 'altro')`
+        : category;
+      const avoid = byItem ? receiptItems.avoidability : extractions.avoidability;
+      const label = {
+        none: sql<string>`'totale'`,
+        category: cat,
+        month: periodOf("month"),
+        merchant: merchantLabel,
+        product: productName,
+      }[q.groupBy];
+
+      const conds: (SQL | undefined)[] = [where];
+      if (q.category) conds.push(eq(cat, q.category));
+      if (q.avoidability) conds.push(eq(avoid, q.avoidability));
+      if (q.merchant) conds.push(sql`${merchantLabel} ilike ${`%${q.merchant}%`}`);
+      if (q.products) {
+        const names = q.products.map((p) => p.toLowerCase());
+        conds.push(names.length ? inArray(sql`lower(${productName})`, names) : sql`false`);
+      }
+
+      const select = db
+        .select({
+          label,
+          total: sql<number>`round(coalesce(sum(${value}), 0), 2)`.mapWith(Number),
+          nReceipts: sql<number>`count(distinct ${receiptsRaw.id})`.mapWith(Number),
+          ...(byItem ? { nItems: sql<number>`count(*)`.mapWith(Number) } : {}),
+        })
+        .from(receiptsRaw)
+        .innerJoin(extractions, join);
+      const filtered = (byItem ? select.innerJoin(receiptItems, item) : select).where(
+        and(...conds),
+      );
+      // Postgres non accetta `group by` su una costante: il totale unico è un'aggregazione semplice.
+      if (q.groupBy === "none") return filtered;
+      return filtered
+        .groupBy(label)
+        .orderBy(q.groupBy === "month" ? asc(label) : desc(sql`2`))
+        .limit(BREAKDOWN_LIMIT);
+    },
+
+    /** Nomi dei prodotti comprati nel periodo, dal più frequente: l'assistente sceglie da qui. */
+    async productNames(userId: string, range: StatsRange, cat?: string) {
+      const { join, where } = base(userId, range);
+      const itemCat = sql<string>`coalesce(${receiptItems.category}, ${extractions.category}, 'altro')`;
+      return db
+        .select({
+          name: productName,
+          count: sql<number>`count(*)`.mapWith(Number),
+          total: sql<number>`round(coalesce(sum(${receiptItems.amount}), 0), 2)`.mapWith(Number),
+        })
+        .from(receiptsRaw)
+        .innerJoin(extractions, join)
+        .innerJoin(
+          receiptItems,
+          and(eq(receiptItems.extractionId, extractions.id), eq(receiptItems.userId, userId)),
+        )
+        .where(cat ? and(where, eq(itemCat, cat)) : where)
+        .groupBy(productName)
+        .orderBy(desc(sql`2`), asc(productName))
+        .limit(PRODUCT_NAMES_LIMIT);
+    },
+
+    /** Scontrini del periodo, dal più recente, per citare le fonti. */
+    async receiptList(
+      userId: string,
+      range: StatsRange,
+      f: { merchant?: string; category?: string },
+    ) {
+      const { join, where } = base(userId, range);
+      const conds: (SQL | undefined)[] = [where];
+      if (f.category) conds.push(eq(category, f.category));
+      if (f.merchant) conds.push(sql`${merchantLabel} ilike ${`%${f.merchant}%`}`);
+      return db
+        .select({
+          id: receiptsRaw.id,
+          date: sql<string>`to_char(${localWhen}, 'YYYY-MM-DD')`,
+          merchant: merchantLabel,
+          total: extractions.total,
+          category,
+        })
+        .from(receiptsRaw)
+        .innerJoin(extractions, join)
+        .where(and(...conds))
+        .orderBy(desc(when))
+        .limit(RECEIPT_LIST_LIMIT);
     },
 
     /** Nomi armonizzati salvati dall'ultimo ricalcolo, per variante. */

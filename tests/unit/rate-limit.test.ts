@@ -54,4 +54,8 @@ describe("rate limit in memoria", () => {
     expect(rateLimitRule("/v1/settings/aix")).toEqual({ bucket: "default", limit: 120 });
     expect(rateLimitRule("/v1/receipts")).toEqual({ bucket: "default", limit: 120 });
   });
+
+  it("10/min su /v1/chat", () => {
+    expect(rateLimitRule("/v1/chat")).toEqual({ bucket: "chat", limit: 10 });
+  });
 });

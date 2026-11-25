@@ -24,6 +24,7 @@ import { createMaintenanceRepo } from "./modules/maintenance/maintenance.repo.js
 import { createMaintenanceService } from "./modules/maintenance/maintenance.service.js";
 import { createStatsRepo } from "./modules/stats/stats.repo.js";
 import { createStatsService } from "./modules/stats/stats.service.js";
+import { createChatService } from "./modules/chat/chat.service.js";
 import { createSupabaseUserAdmin } from "./infra/auth/supabase-user-admin.adapter.js";
 import type { UserAdminPort } from "./ports/user-admin.port.js";
 import type { RateLimitStore } from "./middleware/rate-limit.js";
@@ -73,6 +74,7 @@ export function buildContainer(env: Env, infra: Infra) {
   const settings = createSettingsRepo(infra.db);
   const cipher = keyCipher(env);
   const router = createAiRouter({ settings, usage, clock: infra.clock, cipher, env });
+  const statsRepo = createStatsRepo(infra.db);
 
   return {
     auth: infra.auth,
@@ -106,7 +108,14 @@ export function buildContainer(env: Env, infra: Infra) {
       clock: infra.clock,
       env,
     }),
-    stats: createStatsService({ stats: createStatsRepo(infra.db) }),
+    stats: createStatsService({ stats: statsRepo }),
+    chat: createChatService({
+      stats: statsRepo,
+      router,
+      usage,
+      llm: infra.llm,
+      clock: infra.clock,
+    }),
     maintenance: createMaintenanceService({
       maintenance: createMaintenanceRepo(infra.db),
       storage: infra.storage,

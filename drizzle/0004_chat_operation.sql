@@ -1,0 +1,1 @@
+ALTER TYPE "public"."llm_operation" ADD VALUE 'chat';

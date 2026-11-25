@@ -49,7 +49,7 @@ export const UsageCall = z
   .object({
     id: z.uuid(),
     createdAt: z.iso.datetime(),
-    operation: z.enum(["extract", "reextract", "key_test"]),
+    operation: z.enum(["extract", "reextract", "key_test", "chat"]),
     provider: z.string(),
     model: z.string(),
     keySource: z.enum(["platform", "user"]),

@@ -29,6 +29,13 @@
       "when": 1791754498634,
       "tag": "0003_rate_limits_merchant_names",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795619162708,
+      "tag": "0004_chat_operation",
+      "breakpoints": true
     }
   ]
 }

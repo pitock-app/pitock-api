@@ -66,8 +66,41 @@ export interface LlmPingRequest {
   apiKey: string;
 }
 
+/** Strumento che il modello può chiamare; `input` arriva dal modello e va rivalidato. */
+export interface LlmTool {
+  description: string;
+  inputSchema: z.ZodType;
+  execute(input: unknown): Promise<unknown>;
+}
+
+export interface LlmChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+/** Conversazione con strumenti: il modello li chiama finché non risponde in testo. */
+export interface LlmChatRequest {
+  provider: Provider;
+  model: string;
+  /** In chiaro solo in memoria, per la durata della chiamata. */
+  apiKey: string;
+  instructions: string;
+  messages: LlmChatMessage[];
+  tools: Record<string, LlmTool>;
+  /** Passi massimi (chiamate al modello) prima di fermarsi. */
+  maxSteps: number;
+  abortSignal?: AbortSignal;
+}
+
+export interface LlmChatResult {
+  text: string;
+  /** Somma di tutti i passi. */
+  usage: LlmUsage;
+}
+
 export interface LlmPort {
   generateStructured(req: LlmRequest): Promise<LlmResult>;
+  chat(req: LlmChatRequest): Promise<LlmChatResult>;
   /** Lancia `LlmError` se chiave o modello non funzionano. */
   ping(req: LlmPingRequest): Promise<{ usage: LlmUsage }>;
 }

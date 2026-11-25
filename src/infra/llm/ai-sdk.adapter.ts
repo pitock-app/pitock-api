@@ -1,6 +1,8 @@
 import {
   APICallError,
+  dynamicTool,
   generateText,
+  stepCountIs,
   JSONParseError,
   LoadAPIKeyError,
   NoObjectGeneratedError,
@@ -105,6 +107,32 @@ export function createAiSdkLlm(modelFactory: ModelFactory = createProviderModel)
           ],
         });
         return { output: result.output, usage: toUsage(result.usage) };
+      } catch (err) {
+        throw classifyLlmError(err);
+      }
+    },
+
+    async chat(req) {
+      try {
+        const result = await generateText({
+          model: modelFactory(req.provider, req.model, req.apiKey),
+          instructions: req.instructions,
+          messages: req.messages,
+          tools: Object.fromEntries(
+            Object.entries(req.tools).map(([name, t]) => [
+              name,
+              dynamicTool({
+                description: t.description,
+                inputSchema: t.inputSchema,
+                execute: (input) => t.execute(input),
+              }),
+            ]),
+          ),
+          stopWhen: stepCountIs(req.maxSteps),
+          maxRetries: 1,
+          ...(req.abortSignal ? { abortSignal: req.abortSignal } : {}),
+        });
+        return { text: result.text, usage: toUsage(result.usage) };
       } catch (err) {
         throw classifyLlmError(err);
       }

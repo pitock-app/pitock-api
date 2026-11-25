@@ -12,7 +12,7 @@ export const receiptStatus = pgEnum("receipt_status", [
 export const extractionMethod = pgEnum("extraction_method", ["llm", "manual"]);
 export const keySource = pgEnum("key_source", ["platform", "user"]);
 export const aiMode = pgEnum("ai_mode", ["platform", "byok"]);
-export const llmOperation = pgEnum("llm_operation", ["extract", "reextract", "key_test"]);
+export const llmOperation = pgEnum("llm_operation", ["extract", "reextract", "key_test", "chat"]);
 
 /** Riferimento all'utente proprietario: le righe spariscono con l'utente. */
 export const userIdColumn = () =>

@@ -1,5 +1,7 @@
 import type { Clock } from "../../src/ports/clock.port.js";
 import type {
+  LlmChatRequest,
+  LlmChatResult,
   LlmError,
   LlmPingRequest,
   LlmPort,
@@ -111,10 +113,29 @@ export const PDF = (size = 1024) => {
 type LlmStep = LlmResult | LlmError | ((req: LlmRequest) => LlmResult | LlmError);
 
 /** Modello finto: risponde con i passi accodati, in ordine; registra ogni richiesta. */
+/** Turno di chat finto: restituisce il testo finale, oppure un errore da lanciare. */
+export type ChatStep = ((req: LlmChatRequest) => Promise<string>) | Error;
+
 export class FakeLlm implements LlmPort {
   readonly requests: LlmRequest[] = [];
   readonly pings: LlmPingRequest[] = [];
+  readonly chats: LlmChatRequest[] = [];
   private steps: LlmStep[] = [];
+  private chatSteps: ChatStep[] = [];
+
+  /** Accoda i turni delle prossime `chat`: una funzione può chiamare `req.tools` come farebbe il modello. */
+  respondChat(...steps: ChatStep[]) {
+    this.chatSteps.push(...steps);
+    return this;
+  }
+
+  async chat(req: LlmChatRequest): Promise<LlmChatResult> {
+    this.chats.push(req);
+    const step = this.chatSteps.shift();
+    if (!step) throw new Error("FakeLlm: nessun turno di chat accodato");
+    if (step instanceof Error) throw step;
+    return { text: await step(req), usage: usage(500, 50) };
+  }
 
   /** Accoda le risposte delle prossime chiamate (un `LlmError` viene lanciato). */
   respond(...steps: LlmStep[]) {
@@ -124,6 +145,8 @@ export class FakeLlm implements LlmPort {
 
   reset() {
     this.steps = [];
+    this.chatSteps = [];
+    this.chats.length = 0;
     this.requests.length = 0;
     this.pings.length = 0;
   }

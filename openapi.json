@@ -1273,7 +1273,7 @@
           },
           "operation": {
             "type": "string",
-            "enum": ["extract", "reextract", "key_test"]
+            "enum": ["extract", "reextract", "key_test", "chat"]
           },
           "provider": {
             "type": "string"
@@ -1621,6 +1621,83 @@
           "sizeUnit",
           "avoidability"
         ]
+      },
+      "ChatResponse": {
+        "type": "object",
+        "properties": {
+          "answer": {
+            "type": "string"
+          },
+          "grounded": {
+            "type": "boolean",
+            "description": "true se ogni numero della risposta viene dai dati; false = risposta di ripiego, senza numeri"
+          },
+          "charts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatChart"
+            },
+            "description": "Grafici decisi dall'assistente, con i valori calcolati dal database"
+          }
+        },
+        "required": ["answer", "grounded", "charts"]
+      },
+      "ChatChart": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["bar", "line", "pie"]
+          },
+          "title": {
+            "type": "string"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "description": "Categoria, mese (YYYY-MM), negozio o prodotto"
+                },
+                "value": {
+                  "type": "number",
+                  "description": "Importo in euro, 2 decimali"
+                }
+              },
+              "required": ["label", "value"]
+            }
+          }
+        },
+        "required": ["type", "title", "points"]
+      },
+      "ChatRequest": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": ["user", "assistant"]
+                },
+                "content": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2000
+                }
+              },
+              "required": ["role", "content"]
+            },
+            "minItems": 1,
+            "maxItems": 20,
+            "description": "Conversazione dal più vecchio al più recente; il server non la salva. Ultimo messaggio: utente"
+          }
+        },
+        "required": ["messages"]
       }
     },
     "parameters": {}
@@ -3735,6 +3812,119 @@
           },
           "500": {
             "description": "Errore interno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Servizio temporaneamente non disponibile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/chat": {
+      "post": {
+        "tags": ["chat"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Domanda in linguaggio naturale sulle proprie spese",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Risposta dell'assistente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Richiesta non valida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token mancante o non valido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Nessuna chiave salvata per il provider (USER_KEY_MISSING)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Chiave utente non valida o senza credito",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Troppe richieste",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Errore interno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Provider LLM non disponibile",
             "content": {
               "application/json": {
                 "schema": {

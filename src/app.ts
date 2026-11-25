@@ -14,6 +14,7 @@ import { createLogger, requestLogger } from "./middleware/logger.js";
 import { rateLimit } from "./middleware/rate-limit.js";
 import { requestId } from "./middleware/request-id.js";
 import { accountRoutes } from "./modules/account/account.routes.js";
+import { chatRoutes } from "./modules/chat/chat.routes.js";
 import { receiptsRoutes } from "./modules/receipts/receipts.routes.js";
 import { settingsRoutes } from "./modules/settings/settings.routes.js";
 import { statsCronRoutes, statsRoutes } from "./modules/stats/stats.routes.js";
@@ -42,12 +43,15 @@ const healthRoute = createRoute({
 });
 
 /** Limiti per utente al minuto (sezione 8). */
-export const RATE_LIMITS = { settings: 60, default: 120 } as const;
+export const RATE_LIMITS = { settings: 60, chat: 10, default: 120 } as const;
 
 export const rateLimitRule = (path: string) =>
   /^\/v1\/settings\/ai(\/|$)/.test(path)
     ? { bucket: "settings", limit: RATE_LIMITS.settings }
-    : { bucket: "default", limit: RATE_LIMITS.default };
+    : // Ogni domanda costa fino a 12 chiamate al modello (2 tentativi × 6 passi).
+      path === "/v1/chat"
+      ? { bucket: "chat", limit: RATE_LIMITS.chat }
+      : { bucket: "default", limit: RATE_LIMITS.default };
 
 export interface AppOptions {
   container?: Container;
@@ -103,6 +107,7 @@ export function createApp(env: Env, opts: AppOptions = {}) {
   app.route("/", settingsRoutes());
   app.route("/", usageRoutes());
   app.route("/", statsRoutes());
+  app.route("/", chatRoutes());
   app.route("/", statsCronRoutes(env.CRON_SECRET));
 
   app.openAPIRegistry.registerComponent("securitySchemes", "bearerAuth", {
