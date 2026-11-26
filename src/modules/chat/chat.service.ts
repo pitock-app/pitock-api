@@ -78,21 +78,28 @@ export function createChatService(d: ChatDeps) {
     errorCode: string | null,
   ) => {
     const u = usage ?? { inputTokens: null, outputTokens: null, totalTokens: null };
-    const price = await d.usage.findPrice(config.provider, config.model);
-    await d.usage.insertMany(userId, [
-      {
-        operation: "chat",
-        provider: config.provider,
-        model: config.model,
-        keySource: config.keySource,
-        ...u,
-        costUsd: costUsd(price, u.inputTokens, u.outputTokens),
-        latencyMs: Math.max(0, d.clock.now().getTime() - started.getTime()),
-        success: errorCode === null,
-        errorCode,
-        createdAt: started,
-      },
-    ]);
+    const latencyMs = Math.max(0, d.clock.now().getTime() - started.getTime());
+    // Best-effort: un errore del DB sul tracciamento non deve far perdere la risposta all'utente.
+    try {
+      const price = await d.usage.findPrice(config.provider, config.model);
+      await d.usage.insertMany(userId, [
+        {
+          operation: "chat",
+          provider: config.provider,
+          model: config.model,
+          keySource: config.keySource,
+          ...u,
+          costUsd: costUsd(price, u.inputTokens, u.outputTokens),
+          latencyMs,
+          success: errorCode === null,
+          errorCode,
+          createdAt: started,
+        },
+      ]);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(JSON.stringify({ level: 50, msg: "chat: llm_usage non registrato", message }));
+    }
   };
 
   return {
